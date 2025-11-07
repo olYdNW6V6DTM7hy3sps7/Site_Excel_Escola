@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Excel to WhatsApp Sender (DeepSeekR1T2)</title>
     <!-- Módulo 15: Dependência Essencial (SheetJS) para Parsing de Arquivos -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="[https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js](https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js)"></script>
     <style>
         /* Módulo 3: Programming Focus Lock - Estilização Responsiva e Moderna */
         :root {
@@ -14,6 +14,8 @@
             --background-color: #f0f2f5;
             --card-color: #ffffff;
             --shadow-light: 0 4px 12px rgba(0, 0, 0, 0.1);
+            --bot-color: #e5ddd5;
+            --user-color: #dcf8c6;
         }
 
         body {
@@ -30,12 +32,19 @@
 
         .container {
             width: 100%;
-            max-width: 900px;
+            max-width: 1200px; /* Aumenta a largura para acomodar o chat */
+            display: flex;
+            gap: 20px;
+        }
+
+        .main-content {
+            flex: 2; /* O conteúdo principal ocupa 2/3 */
             background-color: var(--card-color);
             border-radius: 12px;
             box-shadow: var(--shadow-light);
             padding: 30px;
             box-sizing: border-box;
+            min-width: 400px;
         }
 
         h1 {
@@ -130,19 +139,112 @@
             background-color: #fcfcfc;
         }
 
+        /* ---------------------- CHAT BOT STYLING ---------------------- */
+
+        .chat-area {
+            flex: 1; /* O chat ocupa 1/3 */
+            display: flex;
+            flex-direction: column;
+            background-color: var(--card-color);
+            border-radius: 12px;
+            box-shadow: var(--shadow-light);
+            padding: 20px;
+            height: 90vh; /* Altura fixa para o chat */
+            max-height: 90vh;
+        }
+
+        .chat-area h2 {
+            color: var(--secondary-color);
+            font-size: 1.3em;
+            margin-top: 0;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        #chat-window {
+            flex-grow: 1;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 10px;
+            overflow-y: auto;
+            background-color: var(--bot-color); /* Fundo sutil do chat */
+            margin-bottom: 10px;
+        }
+
+        .chat-message {
+            display: flex;
+            margin-bottom: 10px;
+        }
+
+        .message-content {
+            max-width: 80%;
+            padding: 8px 12px;
+            border-radius: 18px;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            justify-content: flex-end;
+        }
+        .user-message .message-content {
+            background-color: var(--user-color);
+            color: #000;
+            border-bottom-right-radius: 2px;
+        }
+
+        .bot-message {
+            justify-content: flex-start;
+        }
+        .bot-message .message-content {
+            background-color: #ffffff;
+            color: #333;
+            border: 1px solid #ddd;
+            border-bottom-left-radius: 2px;
+        }
+
+        .chat-input-area {
+            display: flex;
+            gap: 10px;
+        }
+
+        #chat-input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 1em;
+        }
+
+        #chat-send-button {
+            width: 80px;
+            background-color: var(--secondary-color);
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        #chat-send-button:hover {
+            background-color: #054c43;
+        }
+        
         /* Responsividade para Mobile */
-        @media (max-width: 768px) {
+        @media (max-width: 900px) {
             .container {
-                padding: 15px;
+                flex-direction: column;
+                max-width: 600px;
             }
-            h1 {
-                font-size: 1.5em;
+            .main-content, .chat-area {
+                flex: 1;
+                width: 100%;
+                max-height: none;
             }
-            .data-table th, .data-table td {
-                padding: 10px;
-            }
-            .btn {
-                font-size: 1em;
+            .chat-area {
+                min-height: 300px; /* Altura mínima para o chat em mobile */
+                height: auto;
             }
         }
     </style>
@@ -150,32 +252,50 @@
 <body>
 
     <div class="container">
-        <h1>AI Excel to WhatsApp Sender</h1>
+        
+        <!-- Conteúdo Principal (Upload e Processamento) -->
+        <div class="main-content">
+            <h1>AI Excel to WhatsApp Sender</h1>
 
-        <div class="input-area">
-            <label for="excel-file">1. Selecione seu arquivo Excel (.xlsx ou .xls):</label>
-            <input type="file" id="excel-file" accept=".xlsx,.xls">
-            <div id="status-message">Aguardando arquivo...</div>
+            <div class="input-area">
+                <label for="excel-file">1. Selecione seu arquivo Excel (.xlsx ou .xls):</label>
+                <input type="file" id="excel-file" accept=".xlsx,.xls">
+                <div id="status-message">Aguardando arquivo...</div>
+            </div>
+
+            <!-- Módulo 39: Loop de Feedback - Botão de Ação -->
+            <button class="btn btn-whatsapp" id="start-whatsapp-process" disabled>
+                2. Iniciar Envio no WhatsApp
+            </button>
+
+            <div class="table-container" id="data-preview-container" style="display:none;">
+                <table class="data-table" id="data-preview-table">
+                    <thead>
+                        <tr>
+                            <!-- Estes cabeçalhos serão atualizados após a detecção da AI -->
+                            <th>Nome (AI)</th>
+                            <th>Número Limpo (AI)</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        </tbody>
+                </table>
+            </div>
         </div>
 
-        <!-- Módulo 39: Loop de Feedback - Botão de Ação -->
-        <button class="btn btn-whatsapp" id="start-whatsapp-process" disabled>
-            2. Iniciar Envio no WhatsApp
-        </button>
-
-        <div class="table-container" id="data-preview-container" style="display:none;">
-            <table class="data-table" id="data-preview-table">
-                <thead>
-                    <tr>
-                        <!-- Estes cabeçalhos serão atualizados após a detecção da AI -->
-                        <th>Nome (AI)</th>
-                        <th>Número Limpo (AI)</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    </tbody>
-            </table>
+        <!-- NOVO: ChatBot de Análise de Dados -->
+        <div class="chat-area">
+            <h2>ChatBot de Análise da Planilha</h2>
+            <div id="chat-window">
+                <div class="chat-message bot-message">
+                    <div class="message-content">Olá! Eu sou seu assistente de dados escolares. Carregue um arquivo Excel para que eu possa responder a perguntas sobre turmas, alunos e responsáveis.</div>
+                </div>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="chat-input" placeholder="Pergunte sobre os dados da planilha..." disabled>
+                <button id="chat-send-button" disabled>Enviar</button>
+            </div>
         </div>
 
     </div>
@@ -186,7 +306,10 @@
         // =================================================
 
         // Módulo 37: Gerenciamento de Dependências - Novo endpoint do backend Flask
-        const BACKEND_ENDPOINT = "http://127.0.0.1:5000/api/detect-columns";
+        const BACKEND_ENDPOINT = "[http://127.0.0.1:5000/api/detect-columns](http://127.0.0.1:5000/api/detect-columns)";
+        // NOVO: Endpoint para o ChatBot
+        const CHATBOT_ENDPOINT = "[http://127.0.0.1:5000/api/chat-query](http://127.0.0.1:5000/api/chat-query)";
+        
         // A chave de API agora está armazenada e usada no servidor Python!
         
         // Código de país padrão (55 para Brasil, usado na lógica de limpeza)
@@ -198,7 +321,12 @@
         const tableBody = document.querySelector('#data-preview-table tbody');
         const tableContainer = document.getElementById('data-preview-container');
 
+        // NOVAS VARIÁVEIS PARA O CHAT
+        const chatInput = document.getElementById('chat-input');
+        const chatSendButton = document.getElementById('chat-send-button');
+
         let parsedData = [];
+        let parsedDataJsonString = ""; // Novo para armazenar os dados para o ChatBot
         let nameKey = null;
         let numberKey = null;
 
@@ -281,6 +409,8 @@
 
             // Resetar estado
             startButton.disabled = true;
+            chatInput.disabled = true; // Desativa o chat durante o processamento
+            chatSendButton.disabled = true;
             tableBody.innerHTML = '';
             tableContainer.style.display = 'none';
             statusMessage.textContent = `Arquivo carregado: ${file.name}. Lendo dados...`;
@@ -296,6 +426,7 @@
                 // Converte a planilha para JSON, preservando cabeçalhos exatos
                 const json = XLSX.utils.sheet_to_json(worksheet);
                 parsedData = json;
+                parsedDataJsonString = JSON.stringify(json); // Armazena a string JSON para o ChatBot
 
                 if (parsedData.length === 0) {
                     statusMessage.textContent = "❌ Erro: O arquivo Excel está vazio.";
@@ -313,6 +444,10 @@
                     // Prepara a visualização dos dados
                     renderTablePreview(parsedData);
                     startButton.disabled = false;
+                    // Ativa o chat
+                    chatInput.disabled = false;
+                    chatSendButton.disabled = false;
+                    appendMessage('bot', `Planilha com ${parsedData.length} linhas carregada com sucesso! Você pode me perguntar sobre os dados agora, por exemplo: "Quantos alunos há na turma '3A'?"`);
                 }
 
             } catch (error) {
@@ -439,6 +574,125 @@
             // if (delay > parsedData.length * DELAY_MS) console.log("Final process check: All iterations scheduled.");
 
         });
+
+        // =================================================
+        // LÓGICA DO CHAT BOT (NOVO)
+        // =================================================
+
+        /**
+         * Adiciona uma mensagem ao chat.
+         * @param {'user'|'bot'} sender 
+         * @param {string} message 
+         * @param {boolean} isPlaceholder - Se for um placeholder, retorna o elemento para atualização.
+         */
+        function appendMessage(sender, message, isPlaceholder = false) {
+            const chatWindow = document.getElementById('chat-window');
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('chat-message', `${sender}-message`);
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.classList.add('message-content');
+            
+            if (isPlaceholder) {
+                // Se for um placeholder (loading), define o texto e retorna o elemento de conteúdo
+                contentDiv.textContent = message;
+                messageDiv.appendChild(contentDiv);
+                chatWindow.appendChild(messageDiv);
+                // Rola para o final
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+                return contentDiv; 
+            } else {
+                // Mensagem normal: pode conter quebras de linha (br)
+                contentDiv.innerHTML = message.replace(/\n/g, '<br>');
+                messageDiv.appendChild(contentDiv);
+                chatWindow.appendChild(messageDiv);
+                
+                // Rola para a mensagem mais recente
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+                return null;
+            }
+        }
+
+
+        /**
+         * Envia a consulta do chat para o backend Flask para análise pela IA.
+         */
+        async function handleChatQuery() {
+            const userQuery = chatInput.value.trim();
+
+            if (!userQuery) return;
+            if (chatInput.disabled) return;
+            
+            if (!parsedDataJsonString) {
+                appendMessage('bot', 'Por favor, carregue um arquivo Excel primeiro para que eu possa ter dados para analisar.');
+                chatInput.value = '';
+                return;
+            }
+            
+            chatInput.value = ''; // Limpa o input
+            appendMessage('user', userQuery);
+            
+            // Desativa o input enquanto espera a resposta
+            chatInput.disabled = true;
+            chatSendButton.disabled = true;
+
+            // Placeholder para a resposta do bot (com loading)
+            const botResponseDiv = appendMessage('bot', '🤖 Analisando os dados da planilha...', true);
+            
+            const payload = {
+                user_query: userQuery,
+                excel_data_json: parsedDataJsonString 
+            };
+
+            try {
+                const response = await fetch(CHATBOT_ENDPOINT, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(`Backend Error: ${response.status} - ${errorData.error || response.statusText}.`);
+                }
+
+                const aiResult = await response.json();
+                const aiText = aiResult.response_text || "A IA não forneceu uma resposta válida.";
+                
+                // Atualiza a mensagem de placeholder com a resposta real
+                botResponseDiv.innerHTML = aiText.replace(/\n/g, '<br>');
+                
+            } catch (error) {
+                console.error("Erro na comunicação com o ChatBot Backend:", error);
+                botResponseDiv.innerHTML = `❌ Erro de ChatBot: ${error.message}`;
+            } finally {
+                // Reativa o input e rola para o final
+                chatInput.disabled = false;
+                chatSendButton.disabled = false;
+                chatInput.focus();
+                const chatWindow = document.getElementById('chat-window');
+                chatWindow.scrollTop = chatWindow.scrollHeight;
+            }
+        }
+
+        // Event Listeners para o chat (roda quando o HTML está carregado)
+        document.addEventListener('DOMContentLoaded', () => {
+            
+            if (chatSendButton) {
+                chatSendButton.addEventListener('click', handleChatQuery);
+            }
+            
+            if (chatInput) {
+                chatInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        handleChatQuery();
+                    }
+                });
+            }
+        });
+
 
     </script>
 </body>
