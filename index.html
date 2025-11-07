@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Excel to WhatsApp Sender (DeepSeekR1T2)</title>
     <!-- Módulo 15: Dependência Essencial (SheetJS) para Parsing de Arquivos -->
-    <script src="[https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js](https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js)"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         /* Módulo 3: Programming Focus Lock - Estilização Responsiva e Moderna */
         :root {
@@ -77,6 +77,67 @@
             border: 1px solid #ddd;
             border-radius: 6px;
         }
+        
+        /* Área de Mensagem Personalizada (NOVA) */
+        .message-area {
+            margin-bottom: 25px;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            background-color: #fcfcfc;
+        }
+        
+        .message-area label {
+            font-weight: bold;
+            display: block;
+            margin-bottom: 8px;
+            color: var(--secondary-color);
+        }
+        
+        #custom-message {
+            width: 100%;
+            min-height: 120px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 1em;
+            resize: vertical;
+        }
+
+        /* Credenciais da API (NOVA) */
+        .api-credentials-area {
+            margin-top: 30px;
+            padding: 20px;
+            border: 2px solid var(--secondary-color);
+            border-radius: 8px;
+            background-color: #e6f7f3;
+        }
+        
+        .api-credentials-area h3 {
+            color: var(--secondary-color);
+            margin-top: 0;
+            border-bottom: 1px solid var(--secondary-color);
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .api-input-group {
+            margin-bottom: 15px;
+        }
+        
+        .api-input-group label {
+            display: block;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        
+        .api-input-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
 
         /* Botão Principal */
         .btn {
@@ -90,6 +151,14 @@
             font-size: 1.1em;
             margin-top: 10px;
         }
+        
+        .btn-vcf {
+             background-color: #3b5998; /* Azul escuro para VCF */
+             margin-bottom: 20px;
+        }
+        .btn-vcf:hover:not(:disabled) {
+            background-color: #2d4576; 
+        }
 
         .btn-whatsapp {
             background-color: var(--primary-color);
@@ -100,11 +169,20 @@
             background-color: #128c7e;
         }
 
-        .btn-whatsapp:disabled {
+        .btn-whatsapp:disabled, .btn-vcf:disabled {
             background-color: #ccc;
             cursor: not-allowed;
             opacity: 0.7;
         }
+
+        .btn-api-send {
+             background-color: #075e54; /* Mais escuro para API */
+        }
+        
+        .btn-api-send:hover:not(:disabled) {
+            background-color: #054c43;
+        }
+
 
         /* Tabela de Dados */
         .table-container {
@@ -114,20 +192,29 @@
             border: 1px solid #eee;
             border-radius: 8px;
         }
+        
+        .results-container {
+            margin-top: 30px;
+            overflow-x: auto;
+            max-height: 500px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+        }
 
-        .data-table {
+        .data-table, .results-table {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.9em;
         }
 
-        .data-table th, .data-table td {
+        .data-table th, .data-table td, 
+        .results-table th, .results-table td {
             padding: 12px 15px;
             text-align: left;
             border-bottom: 1px solid #eee;
         }
 
-        .data-table th {
+        .data-table th, .results-table th {
             background-color: #f8f8f8;
             color: var(--secondary-color);
             position: sticky;
@@ -135,9 +222,14 @@
             z-index: 10;
         }
 
-        .data-table tbody tr:nth-child(even) {
+        .data-table tbody tr:nth-child(even), 
+        .results-table tbody tr:nth-child(even) {
             background-color: #fcfcfc;
         }
+        
+        .status-success { color: var(--primary-color); font-weight: bold; }
+        .status-failure { color: #d32f2f; font-weight: bold; }
+        .status-pending { color: #fbc02d; font-weight: bold; }
 
         /* ---------------------- CHAT BOT STYLING ---------------------- */
 
@@ -262,11 +354,58 @@
                 <input type="file" id="excel-file" accept=".xlsx,.xls">
                 <div id="status-message">Aguardando arquivo...</div>
             </div>
+            
+            <!-- NOVO: Área de Mensagem Personalizada -->
+            <div class="message-area">
+                <label for="custom-message">2. Mensagem (use **{name}** para personalizar):</label>
+                <textarea id="custom-message">Olá {name}, segue a comunicação importante da escola. Por favor, responda 'OK' para confirmar o recebimento.</textarea>
+                <p style="font-size: 0.85em; color: #555; margin-top: 5px;">*O placeholder {name} será substituído pelo nome detectado pela IA.</p>
+            </div>
+            
+            <!-- Credenciais e Opções de Envio -->
+            <div class="api-credentials-area">
+                <h3>3. Opções de Envio</h3>
+                
+                <!-- BOTÃO VCF EM MASSA -->
+                <button class="btn btn-vcf" id="start-vcf-process" disabled>
+                    4. Baixar Contatos (Arquivo VCF em Massa)
+                </button>
+                <p style="font-size: 0.85em; color: #3b5998;">*Baixe este arquivo no celular para salvar todos os contatos na sua agenda/WhatsApp.</p>
+                
+                
+                <div style="margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 15px;">
+                    <label style="font-weight: bold;">Ou escolha o Modo de Envio de Mensagem:</label>
+                    <input type="radio" id="send-mode-link" name="send-mode" value="link" checked>
+                    <label for="send-mode-link" style="font-weight: normal; display: inline; margin-left: 5px;">Via **Link wa.me** (Abre Pop-ups, Não Requer API)</label><br>
+                    
+                    <input type="radio" id="send-mode-api" name="send-mode" value="api">
+                    <label for="send-mode-api" style="font-weight: normal; display: inline; margin-left: 5px;">Via **Cloud API** (Requer Chave Meta, Envio em Background)</label>
+                </div>
+                
+                <div id="api-inputs" style="display: none; border-top: 1px dashed #ccc; padding-top: 15px;">
+                    <p style="font-size: 0.85em; color: #d32f2f;">**ATENÇÃO:** O envio via API requer um **Template APROVADO** pela Meta. Sua mensagem deve ser exatamente a do template (com o primeiro parâmetro sendo o nome).</p>
+                    <div class="api-input-group">
+                        <label for="meta-token">Access Token da Meta (Temporário):</label>
+                        <input type="password" id="meta-token" placeholder="Insira seu Access Token da Meta aqui">
+                    </div>
+                    <div class="api-input-group">
+                        <label for="phone-id">Phone Number ID (ID do Telefone no Meta):</label>
+                        <input type="text" id="phone-id" placeholder="Insira seu ID de Telefone aqui">
+                    </div>
+                    <div class="api-input-group">
+                        <label for="template-name">Nome do Template Aprovado:</label>
+                        <input type="text" id="template-name" placeholder="Ex: ola_novo_cliente (sem o código de idioma)">
+                    </div>
+                </div>
+                
+                <button class="btn btn-whatsapp" id="start-whatsapp-process" disabled>
+                    5. Iniciar Processo de Envio
+                </button>
+                <button class="btn btn-api-send" id="start-api-process" style="display: none;" disabled>
+                    5. Enviar Mensagens em Massa via API
+                </button>
+            </div>
 
-            <!-- Módulo 39: Loop de Feedback - Botão de Ação -->
-            <button class="btn btn-whatsapp" id="start-whatsapp-process" disabled>
-                2. Iniciar Envio no WhatsApp
-            </button>
 
             <div class="table-container" id="data-preview-container" style="display:none;">
                 <table class="data-table" id="data-preview-table">
@@ -276,9 +415,28 @@
                             <th>Nome (AI)</th>
                             <th>Número Limpo (AI)</th>
                             <th>Status</th>
+                            <th>Ação Rápida</th> <!-- NOVO CABEÇALHO -->
                         </tr>
                     </thead>
                     <tbody>
+                        </tbody>
+                </table>
+            </div>
+            
+            <!-- Tabela de Resultados da API (NOVA) -->
+            <div class="results-container" id="api-results-container" style="display:none;">
+                <h3>Registro de Envio da API</h3>
+                <table class="results-table" id="api-results-table">
+                    <thead>
+                        <tr>
+                            <th>Linha</th>
+                            <th>Nome</th>
+                            <th>Número</th>
+                            <th>Status</th>
+                            <th>Detalhe/ID da Mensagem</th>
+                        </tr>
+                    </thead>
+                    <tbody id="api-results-body">
                         </tbody>
                 </table>
             </div>
@@ -305,97 +463,131 @@
         // JAVASCRIPT: Lógica de Parsing, AI e WhatsApp
         // =================================================
 
-        // Módulo 37: Gerenciamento de Dependências - Novo endpoint do backend Flask
-        const BACKEND_ENDPOINT = "[http://127.0.0.1:5000/api/detect-columns](http://127.0.0.1:5000/api/detect-columns)";
-        // NOVO: Endpoint para o ChatBot
-        const CHATBOT_ENDPOINT = "[http://127.0.0.1:5000/api/chat-query](http://127.0.0.1:5000/api/chat-query)";
-        
-        // A chave de API agora está armazenada e usada no servidor Python!
+        // Módulo 37: Gerenciamento de Dependências - Endpoints
+        const BACKEND_ENDPOINT = "http://127.0.0.1:5000/api/detect-columns";
+        const CHATBOT_ENDPOINT = "http://127.0.0.1:5000/api/chat-query";
+        const WHATSAPP_API_ENDPOINT = "http://127.0.0.1:5000/api/send-whatsapp-api";
         
         // Código de país padrão (55 para Brasil, usado na lógica de limpeza)
         const DEFAULT_COUNTRY_CODE = '55'; 
 
         const fileInput = document.getElementById('excel-file');
         const statusMessage = document.getElementById('status-message');
-        const startButton = document.getElementById('start-whatsapp-process');
+        
+        // Botões e inputs de envio
+        const startLinkProcessButton = document.getElementById('start-whatsapp-process'); // wa.me link
+        const startApiProcessButton = document.getElementById('start-api-process');     // API Meta
+        const startVcfProcessButton = document.getElementById('start-vcf-process');     // VCF Download
+        const customMessageInput = document.getElementById('custom-message');
+        
+        // Credenciais da API
+        const apiInputsDiv = document.getElementById('api-inputs');
+        const metaTokenInput = document.getElementById('meta-token');
+        const phoneIdInput = document.getElementById('phone-id');
+        const templateNameInput = document.getElementById('template-name');
+        
+        // Contêineres de UI
         const tableBody = document.querySelector('#data-preview-table tbody');
         const tableContainer = document.getElementById('data-preview-container');
+        const apiResultsContainer = document.getElementById('api-results-container');
+        const apiResultsBody = document.getElementById('api-results-body');
 
         // NOVAS VARIÁVEIS PARA O CHAT
         const chatInput = document.getElementById('chat-input');
         const chatSendButton = document.getElementById('chat-send-button');
 
         let parsedData = [];
-        let parsedDataJsonString = ""; // Novo para armazenar os dados para o ChatBot
+        let parsedDataJsonString = ""; 
         let nameKey = null;
         let numberKey = null;
 
         /**
+         * Lógica para alternar entre os modos de envio (Link vs API).
+         */
+        document.querySelectorAll('input[name="send-mode"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                const isApiMode = document.getElementById('send-mode-api').checked;
+                
+                apiInputsDiv.style.display = isApiMode ? 'block' : 'none';
+                startLinkProcessButton.style.display = isApiMode ? 'none' : 'block';
+                startApiProcessButton.style.display = isApiMode ? 'block' : 'none';
+
+                // Revalida o botão após a troca de modo (se houver dados carregados)
+                if (parsedData.length > 0) {
+                    toggleSendButtons(true); 
+                }
+            });
+        });
+
+
+        /**
+         * Habilita/Desabilita os botões de envio baseados no estado.
+         * @param {boolean} enable
+         */
+        function toggleSendButtons(enable) {
+            startLinkProcessButton.disabled = !enable;
+            startApiProcessButton.disabled = !enable;
+            startVcfProcessButton.disabled = !enable; // Habilita/Desabilita o botão VCF
+        }
+
+        /**
          * Módulo 22: Otimização de Código - Limpeza e Formatação de Números
-         * Função O(N) para limpar o número e garantir o código de país.
          * @param {string} number - O número de telefone.
-         * @returns {string} O número limpo e formatado.
+         * @returns {string} O número limpo e formatado (E.164).
          */
         function cleanAndFormatNumber(number) {
             if (!number) return '';
             
             let cleaned = String(number).replace(/\D/g, '');
 
-            // Módulo 13: Inductive Generalization - Aplica regra geral para números nacionais.
+            // Simplificação para garantir CC e DD.
             if (cleaned.length >= 8 && cleaned.length <= 11 && !cleaned.startsWith(DEFAULT_COUNTRY_CODE)) {
                 return DEFAULT_COUNTRY_CODE + cleaned;
             }
-            return cleaned;
+            // A API da Meta geralmente espera 55XXXXXXXXXXXXX
+            if (cleaned.length === 13 && cleaned.startsWith(DEFAULT_COUNTRY_CODE)) {
+                return cleaned;
+            }
+            
+            // Se não se encaixa nos padrões comuns, assume o valor limpo
+            return cleaned.length >= 10 ? cleaned : '';
         }
 
         /**
          * Módulo 4: Simulação de Chamada - AGORA CHAMA O SERVIDOR PYTHON
-         * Envia cabeçalhos e amostra de dados para o servidor Python, que chama a IA.
-         * @param {Array<string>} headers - Lista de cabeçalhos da planilha.
-         * @param {Object} sampleRow - Uma linha de exemplo dos dados.
          */
         async function detectColumnsWithAI(headers, sampleRow) {
             statusMessage.textContent = "🤖 Enviando dados para o Backend Python para análise com IA...";
 
-            const payload = {
-                headers: headers,
-                sample_row: sampleRow
-            };
+            const payload = { headers: headers, sample_row: sampleRow };
 
             try {
-                // Módulo 3: Programming Focus Lock - Foco na comunicação com o backend
                 const response = await fetch(BACKEND_ENDPOINT, {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload)
                 });
 
                 if (!response.ok) {
-                    // Módulo 23: Tratamento de Erros - Erro de comunicação com o backend
                     const errorData = await response.json().catch(() => ({}));
-                    throw new Error(`Backend Error: ${response.status} - ${errorData.error || response.statusText}. Por favor, verifique se o servidor Python está rodando (python openrouter_backend_api.py).`);
+                    throw new Error(`Backend Error: ${response.status} - ${errorData.error || response.statusText}.`);
                 }
 
-                // A resposta final deve ser o JSON limpo do AI
                 const aiResult = await response.json();
                 
                 if (aiResult.name_key && aiResult.number_key) {
-                    // Módulo 1: Quantum Super Programmer - Sucesso na Identificação
                     nameKey = aiResult.name_key;
                     numberKey = aiResult.number_key;
                     statusMessage.textContent = `✅ Sucesso! Backend Python (Flask) retornou: Nome='${nameKey}', Número='${numberKey}'.`;
                     return true;
                 } else {
-                    // Módulo 23: Tratamento de Exceção - Falha na Estrutura JSON
                     throw new Error("Backend retornou uma resposta da IA que estava faltando 'name_key' ou 'number_key'.");
                 }
 
             } catch (error) {
                 console.error("Erro na comunicação com o Backend:", error);
-                statusMessage.textContent = `❌ Erro de Integração: ${error.message}. Certifique-se de que o servidor Python está ativo na porta 5000.`;
-                startButton.disabled = true;
+                statusMessage.textContent = `❌ Erro de Integração: ${error.message}. Verifique o servidor Flask e a chave OPENROUTER_API_KEY.`;
+                toggleSendButtons(false);
                 return false;
             }
         }
@@ -408,71 +600,65 @@
             if (!file) return;
 
             // Resetar estado
-            startButton.disabled = true;
-            chatInput.disabled = true; // Desativa o chat durante o processamento
+            toggleSendButtons(false);
+            chatInput.disabled = true; 
             chatSendButton.disabled = true;
             tableBody.innerHTML = '';
             tableContainer.style.display = 'none';
+            apiResultsContainer.style.display = 'none'; // Esconde resultados da API
             statusMessage.textContent = `Arquivo carregado: ${file.name}. Lendo dados...`;
 
             try {
-                // Leitura do arquivo (SheetJS)
                 const data = await file.arrayBuffer();
                 const workbook = XLSX.read(data, { type: 'array' });
-                // Assume a primeira planilha
-                const sheetName = workbook.SheetNames[0];
-                const worksheet = workbook.Sheets[sheetName];
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
                 
-                // Converte a planilha para JSON, preservando cabeçalhos exatos
                 const json = XLSX.utils.sheet_to_json(worksheet);
                 parsedData = json;
-                parsedDataJsonString = JSON.stringify(json); // Armazena a string JSON para o ChatBot
+                parsedDataJsonString = JSON.stringify(json); 
 
                 if (parsedData.length === 0) {
                     statusMessage.textContent = "❌ Erro: O arquivo Excel está vazio.";
                     return;
                 }
 
-                // Extrai headers e sample (necessário para a AI)
                 const headers = Object.keys(parsedData[0]);
                 const sampleRow = parsedData[0];
                 
-                // Módulo 4: Chamada de AI (via Backend) para mapeamento
                 const aiSuccess = await detectColumnsWithAI(headers, sampleRow);
 
                 if (aiSuccess) {
-                    // Prepara a visualização dos dados
                     renderTablePreview(parsedData);
-                    startButton.disabled = false;
-                    // Ativa o chat
+                    toggleSendButtons(true);
+                    
                     chatInput.disabled = false;
                     chatSendButton.disabled = false;
-                    appendMessage('bot', `Planilha com ${parsedData.length} linhas carregada com sucesso! Você pode me perguntar sobre os dados agora, por exemplo: "Quantos alunos há na turma '3A'?"`);
+                    appendMessage('bot', `Planilha com ${parsedData.length} linhas carregada com sucesso! Você pode me perguntar sobre os dados agora.`);
                 }
 
             } catch (error) {
                 console.error("Erro ao processar o arquivo:", error);
-                // Módulo 23: Tratamento de Exceções Robustas
                 statusMessage.textContent = `❌ Erro ao ler o Excel: ${error.message}. Certifique-se de que é um arquivo .xlsx/.xls válido.`;
             }
         });
 
         /**
-         * Módulo 26: Construtor de Respostas - Renderiza a tabela de visualização.
-         * @param {Array<Object>} data - Os dados JSON da planilha.
+         * Renderiza a tabela de visualização.
          */
         function renderTablePreview(data) {
             tableBody.innerHTML = '';
+            apiResultsBody.innerHTML = ''; // Limpa resultados anteriores da API
             
-            // Reconstroi os cabeçalhos da tabela para mostrar a detecção da AI
             const tableHead = document.querySelector('#data-preview-table thead tr');
+            // ADICIONA A COLUNA DE AÇÃO RÁPIDA/FALLBACK
             tableHead.innerHTML = `
+                <th>Linha</th>
                 <th>Nome Detectado (${nameKey})</th>
                 <th>Número Limpo (${numberKey})</th>
                 <th>Status</th>
+                <th>Ação Rápida</th> <!-- NOVA COLUNA -->
             `;
             
-            // Módulo 38: Scalability Tester - Limita a visualização para grandes datasets
             const previewLimit = 50;
             const dataToPreview = data.slice(0, previewLimit);
             const isTruncated = data.length > previewLimit;
@@ -485,83 +671,198 @@
                 const tr = document.createElement('tr');
                 tr.dataset.index = index;
                 tr.innerHTML = `
+                    <td>${index + 1}</td>
                     <td>${name}</td>
                     <td>${formattedNumber}</td>
-                    <td data-status="pending">Aguardando...</td>
+                    <td data-status="link-pending">Aguardando Envio...</td>
+                    <!-- NOVO: Botão VCF Individual -->
+                    <td>
+                        <button onclick="downloadSingleVCF(${index})" 
+                                style="padding: 5px 10px; background-color: #555; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            VCF
+                        </button>
+                    </td>
                 `;
                 tableBody.appendChild(tr);
             });
 
             if (isTruncated) {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td colspan="3" style="text-align:center; font-style:italic;">... E mais ${data.length - previewLimit} contatos. Apenas os ${previewLimit} primeiros são exibidos.</td>`;
+                tr.innerHTML = `<td colspan="5" style="text-align:center; font-style:italic;">... E mais ${data.length - previewLimit} contatos. Apenas os ${previewLimit} primeiros são exibidos.</td>`;
                 tableBody.appendChild(tr);
             }
 
             tableContainer.style.display = 'block';
         }
 
-
+        // =================================================
+        // LÓGICA DE GERAÇÃO E DOWNLOAD DE VCF (NOVO)
+        // =================================================
+        
         /**
-         * Módulo 25: Resource Constraint Handler - Inicia o processo de abertura de chats no WhatsApp.
+         * Gera o conteúdo da string VCF (vCard).
+         * @param {Object|Array<Object>} inputData - Um único objeto de linha ou o array completo.
+         * @returns {string} O conteúdo VCF.
          */
-        startButton.addEventListener('click', () => {
+        function generateVCFContent(inputData, nameKey, numberKey) {
+            const data = Array.isArray(inputData) ? inputData : [inputData];
+            let vcfBlocks = [];
+            
+            data.forEach((row) => {
+                const name = row[nameKey] ? String(row[nameKey]).trim() : '';
+                const originalNumber = row[numberKey];
+                const cleanedNumber = cleanAndFormatNumber(originalNumber); 
+                
+                // Validação básica: precisa ter nome e um número limpo E.164
+                if (name && cleanedNumber && cleanedNumber.length >= 10) {
+                    // Adiciona o '+' para padronização internacional VCF mais robusta
+                    const vcfBlock = `BEGIN:VCARD
+VERSION:3.0
+FN:${name}
+N:;${name};;;
+TEL;TYPE=CELL:+${cleanedNumber}
+END:VCARD`;
+                    vcfBlocks.push(vcfBlock);
+                }
+            });
+            
+            return vcfBlocks.join('\n');
+        }
+
+        startVcfProcessButton.addEventListener('click', () => {
             if (parsedData.length === 0 || !nameKey || !numberKey) {
                 statusMessage.textContent = "❌ Nenhum dado carregado ou colunas não identificadas.";
                 return;
             }
-
-            // Mensagem de registro pré-preenchida
-            // Módulo 32: Inclusão Cultural - Usa placeholder neutro {name}
-            const baseMessage = "Olá {name}, esta é uma mensagem automática para confirmar seu registro. Por favor, responda 'SIM' para completar.";
             
-            statusMessage.textContent = "⚠️ Iniciando aberturas de chat. PERMITA POP-UPS do seu navegador.";
-            startButton.disabled = true;
+            statusMessage.textContent = "⚙️ Gerando arquivo VCF...";
+            toggleSendButtons(false);
+            apiResultsContainer.style.display = 'none';
+
+            try {
+                const vcfContent = generateVCFContent(parsedData, nameKey, numberKey);
+                
+                if (vcfContent.length === 0) {
+                    statusMessage.textContent = "❌ Não foi possível gerar nenhum contato VCF. Verifique se as colunas Nome e Número estão corretas.";
+                    return;
+                }
+
+                // Cria um Blob e dispara o download
+                const blob = new Blob([vcfContent], { type: 'text/vcard;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `contatos_escola_${Date.now()}.vcf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                const numContatos = vcfContent.split('END:VCARD').length - 1;
+                statusMessage.textContent = `✅ Arquivo VCF gerado e download iniciado com ${numContatos} contatos! Abra o arquivo no seu celular.`;
+
+            } catch (error) {
+                statusMessage.textContent = `❌ Erro ao gerar VCF: ${error.message}`;
+                console.error("VCF Generation Error:", error);
+            } finally {
+                toggleSendButtons(true);
+            }
+        });
+        
+        /**
+         * Funçao para baixar um VCF individual (NOVO FALLBACK SOLICITADO)
+         * @param {number} index - O índice da linha na matriz parsedData.
+         */
+        function downloadSingleVCF(index) {
+             const row = parsedData[index];
+             if (!row) {
+                 statusMessage.textContent = "❌ Erro: Contato individual não encontrado.";
+                 return;
+             }
+             
+             const vcfContent = generateVCFContent(row, nameKey, numberKey);
+             
+             if (vcfContent.length === 0) {
+                 statusMessage.textContent = "❌ Não foi possível gerar o VCF para este contato. Número inválido.";
+                 return;
+             }
+
+             const name = row[nameKey] ? String(row[nameKey]).trim() : 'Contato';
+             
+             // Cria um Blob e dispara o download
+             const blob = new Blob([vcfContent], { type: 'text/vcard;charset=utf-8' });
+             const url = URL.createObjectURL(blob);
+             const a = document.createElement('a');
+             a.href = url;
+             a.download = `${name}_${cleanAndFormatNumber(row[numberKey])}.vcf`;
+             document.body.appendChild(a);
+             a.click();
+             document.body.removeChild(a);
+             URL.revokeObjectURL(url);
+             
+             statusMessage.textContent = `✅ VCF individual para ${name} baixado. Abra o arquivo para salvar o contato.`;
+        }
+
+
+        // =================================================
+        // LÓGICA DE ENVIO VIA LINK (wa.me)
+        // =================================================
+
+        startLinkProcessButton.addEventListener('click', () => {
+            if (parsedData.length === 0 || !nameKey || !numberKey) return;
+
+            const baseMessage = customMessageInput.value.trim();
+            if (!baseMessage) {
+                statusMessage.textContent = "❌ Por favor, digite a mensagem que deseja enviar.";
+                return;
+            }
+            
+            // Mensagem de status aprimorada para o usuário
+            statusMessage.textContent = "⚠️ Iniciando aberturas de chat. PERMITA POP-UPS do seu navegador. O WhatsApp irá oferecer a opção 'Adicionar Contato'.";
+            toggleSendButtons(false);
+            apiResultsContainer.style.display = 'none';
 
             let delay = 0;
-            const DELAY_MS = 500; // 500ms de atraso (Módulo 25: ajuda a mitigar bloqueio de pop-up)
+            const DELAY_MS = 500; 
             
             parsedData.forEach((row, index) => {
                 const name = row[nameKey] || 'Contato';
-                const originalNumber = row[numberKey];
-                const number = cleanAndFormatNumber(originalNumber);
+                const number = cleanAndFormatNumber(row[numberKey]);
                 
-                if (number.length < 10) { // Módulo 20: Teste Edge Case - Ignora números muito curtos
+                if (number.length < 10) { 
                     const rowElement = document.querySelector(`tr[data-index='${index}'] td[data-status]`);
                     if (rowElement) {
                         rowElement.textContent = 'Número Inválido';
-                        rowElement.style.color = 'red';
+                        rowElement.className = 'status-failure';
                     }
                     return;
                 }
 
                 const personalizedMessage = baseMessage.replace('{name}', name);
                 const encodedMessage = encodeURIComponent(personalizedMessage);
-                // Módulo 2: Safety Check - URL de protocolo seguro (https)
+                // O link wa.me é o método de fallback mais robusto:
+                // Abre o chat, onde o WhatsApp oferece 'Adicionar Contato' para números não salvos.
                 const whatsappURL = `https://wa.me/${number}?text=${encodedMessage}`;
                 
-                // Módulo 25: Resource Constraint Handler - Usa setTimeout para controle de fluxo
                 setTimeout(() => {
                     const rowElement = document.querySelector(`tr[data-index='${index}'] td[data-status]`);
                     
-                    // Simulação de Verificação: window.open deve ser envolvido em try/catch
                     try {
                         window.open(whatsappURL, '_blank');
                         if (rowElement) {
                             rowElement.textContent = '✅ Chat Aberto';
-                            rowElement.style.color = 'var(--primary-color)';
+                            rowElement.className = 'status-success';
                         }
                     } catch (e) {
                         if (rowElement) {
                             rowElement.textContent = '❌ Bloqueado';
-                            rowElement.style.color = 'darkorange';
+                            rowElement.className = 'status-failure';
                         }
                         statusMessage.textContent = "❌ Pop-up bloqueado. Permita os pop-ups e tente novamente.";
                     }
                     
-                    // Reabilita o botão após a última iteração
                     if (index === parsedData.length - 1) {
-                        startButton.disabled = false;
+                        toggleSendButtons(true);
                         statusMessage.textContent = "Processo de abertura concluído. Verifique suas novas abas.";
                     }
 
@@ -569,21 +870,109 @@
 
                 delay += DELAY_MS; 
             });
-            
-            // Módulo 20: Simulação de Teste Unitário (Finalização do Processo)
-            // if (delay > parsedData.length * DELAY_MS) console.log("Final process check: All iterations scheduled.");
-
         });
 
+
         // =================================================
-        // LÓGICA DO CHAT BOT (NOVO)
+        // LÓGICA DE ENVIO VIA API (Meta/Cloud)
+        // =================================================
+        
+        startApiProcessButton.addEventListener('click', async () => {
+            if (parsedData.length === 0 || !nameKey || !numberKey) return;
+            
+            const token = metaTokenInput.value.trim();
+            const phoneId = phoneIdInput.value.trim();
+            const templateName = templateNameInput.value.trim();
+            
+            if (!token || !phoneId || !templateName) {
+                statusMessage.textContent = "❌ Por favor, preencha todos os campos da API da Meta.";
+                return;
+            }
+            
+            statusMessage.textContent = "⚙️ Iniciando envio em massa via WhatsApp Cloud API. Aguarde o relatório de resultados...";
+            toggleSendButtons(false);
+            apiResultsContainer.style.display = 'block';
+            apiResultsBody.innerHTML = ''; // Limpa resultados anteriores
+
+            // 1. Prepara a lista de contatos para envio
+            const contactsToSend = parsedData.map((row, index) => {
+                const name = row[nameKey] || 'Contato';
+                const number = cleanAndFormatNumber(row[numberKey]);
+                
+                // Note: Aqui, o `name` é o único parâmetro para o template da Meta, 
+                // e o `number` já está no formato E.164 (limpo).
+                return {
+                    original_index: index + 1,
+                    name: name,
+                    number: number,
+                };
+            });
+
+            // 2. Chama o endpoint do backend
+            const payload = {
+                contacts: contactsToSend,
+                token: token,
+                phone_id: phoneId,
+                template_name: templateName
+            };
+
+            try {
+                const response = await fetch(WHATSAPP_API_ENDPOINT, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(`Backend Error: ${response.status} - ${errorData.error || response.statusText}.`);
+                }
+
+                const apiResult = await response.json();
+                
+                // 3. Renderiza os resultados
+                renderApiResults(apiResult.results);
+                
+                const successCount = apiResult.results.filter(r => r.status === 'Success').length;
+                const totalCount = apiResult.results.length;
+                statusMessage.textContent = `✅ Envio via API concluído! Sucessos: ${successCount}/${totalCount}. Verifique o relatório abaixo.`;
+
+            } catch (error) {
+                console.error("Erro no Envio via API:", error);
+                statusMessage.textContent = `❌ Falha crítica no envio via API. ${error.message}.`;
+            } finally {
+                toggleSendButtons(true);
+            }
+        });
+        
+        /**
+         * Renderiza os resultados do envio da API na tabela dedicada.
+         */
+        function renderApiResults(results) {
+            apiResultsBody.innerHTML = '';
+            results.forEach(result => {
+                const tr = document.createElement('tr');
+                const statusClass = result.status === 'Success' ? 'status-success' : 'status-failure';
+                const detailText = result.status === 'Success' ? `ID: ${result.detail}` : result.detail;
+
+                tr.innerHTML = `
+                    <td>${result.original_index}</td>
+                    <td>${result.name}</td>
+                    <td>${result.number || 'N/A'}</td>
+                    <td class="${statusClass}">${result.status === 'Success' ? 'Sucesso' : 'Falha'}</td>
+                    <td>${detailText}</td>
+                `;
+                apiResultsBody.appendChild(tr);
+            });
+        }
+
+
+        // =================================================
+        // LÓGICA DO CHAT BOT
         // =================================================
 
         /**
          * Adiciona uma mensagem ao chat.
-         * @param {'user'|'bot'} sender 
-         * @param {string} message 
-         * @param {boolean} isPlaceholder - Se for um placeholder, retorna o elemento para atualização.
          */
         function appendMessage(sender, message, isPlaceholder = false) {
             const chatWindow = document.getElementById('chat-window');
@@ -594,20 +983,16 @@
             contentDiv.classList.add('message-content');
             
             if (isPlaceholder) {
-                // Se for um placeholder (loading), define o texto e retorna o elemento de conteúdo
                 contentDiv.textContent = message;
                 messageDiv.appendChild(contentDiv);
                 chatWindow.appendChild(messageDiv);
-                // Rola para o final
                 chatWindow.scrollTop = chatWindow.scrollHeight;
                 return contentDiv; 
             } else {
-                // Mensagem normal: pode conter quebras de linha (br)
                 contentDiv.innerHTML = message.replace(/\n/g, '<br>');
                 messageDiv.appendChild(contentDiv);
                 chatWindow.appendChild(messageDiv);
                 
-                // Rola para a mensagem mais recente
                 chatWindow.scrollTop = chatWindow.scrollHeight;
                 return null;
             }
@@ -647,9 +1032,7 @@
             try {
                 const response = await fetch(CHATBOT_ENDPOINT, {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(payload)
                 });
 
