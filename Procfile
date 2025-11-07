@@ -1,1 +1,1 @@
-web: sh setup.sh && streamlit run whatsapp_excel_integrator.py --server.port $PORT --server.enableCORS false
+web: python Site_Excel_Escola/openrouter_backend_api.py
