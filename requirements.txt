@@ -1,5 +1,5 @@
-streamlit
-pandas
+flask
 requests
-openpyxl # Necessário para ler arquivos .xlsx
-gunicorn # Servidor de produção recomendado para Streamlit em plataformas cloud
+gunicorn
+pandas
+openpyxl
