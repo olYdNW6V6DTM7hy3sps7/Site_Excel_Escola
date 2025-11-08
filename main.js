@@ -1,10 +1,10 @@
 // WhatsApp Bulk Contact Manager & Messenger
 // Main JavaScript Module
 // ATUALIZADO: 8 de Novembro de 2025
-// - NOVO: Lógica de "Integração Mista"
-// - A IA agora recebe uma amostra grande (até 200 contatos)
-// - Novo modal de confirmação para envio de dados/tokens para a IA
-// - IA atua como "tradutora" de comandos complexos para `[DELETE_IDS: ...]`
+// - NOVO: Lógica de "Busca Paginada Escalável"
+// - A IA agora recebe lotes de 200 contatos, um de cada vez.
+// - O JS gerencia o estado da busca (aiSearchState) e o loop de páginas.
+// - A IA atua como "tradutora" de comandos complexos para tags de busca.
 
 // ** VARIÁVEL DE AMBIENTE DA API **
 const API_BASE_URL = 'https://site-excel-escola-v1-1-0.onrender.com';
@@ -23,6 +23,16 @@ class WhatsAppBulkManager {
         
         // Armazena a mensagem pendente enquanto aguarda a confirmação da IA
         this.pendingAiMessage = "";
+        
+        // NOVO: Gerenciador de Estado da Busca Paginada
+        this.aiSearchState = {
+            running: false,
+            query: "",
+            page: 0,
+            chunkSize: 200,
+            foundKeepId: null,      // Para "todos exceto X"
+            foundDeleteIds: [], // Para "remover turma Y"
+        };
 
         this.initializeElements();
         this.bindEvents();
@@ -155,12 +165,13 @@ class WhatsAppBulkManager {
         // NOVO: Eventos do Modal de Confirmação (Envio IA)
         this.aiConfirmCancelBtn.addEventListener('click', () => {
             this.hideModal('aiConfirmModal');
-            this.addMessage("Envio para a IA cancelado.", 'ai');
+            this.addMessage("Busca escalável cancelada.", 'ai');
         });
         this.aiConfirmSendBtn.addEventListener('click', () => {
             this.hideModal('aiConfirmModal');
             if (this.pendingAiMessage) {
-                this.callChatAPI(this.pendingAiMessage); // Chama a API de verdade
+                // ATUALIZAÇÃO: Inicia a busca paginada em vez de chamar a API diretamente
+                this.startPaginatedAiSearch(this.pendingAiMessage); 
                 this.pendingAiMessage = ""; // Limpa a mensagem pendente
             }
         });
@@ -210,6 +221,12 @@ class WhatsAppBulkManager {
         const userMessage = this.chatInput.value.trim();
         if (!userMessage) return;
 
+        // Se uma busca já estiver rodando, não faça nada
+        if (this.aiSearchState.running) {
+            this.showError("Por favor, aguarde a busca escalável atual terminar.");
+            return;
+        }
+
         this.addMessage(userMessage, 'user');
         this.chatInput.value = '';
         this.chatSendBtn.disabled = true;
@@ -225,30 +242,34 @@ class WhatsAppBulkManager {
         this.prepareAndConfirmAiCall(userMessage);
     }
     
-    // NOVO: Pede confirmação antes de enviar dados para a IA
+    // ATUALIZAÇÃO: Pede confirmação (LGPD) e avisa sobre a busca em lotes
     prepareAndConfirmAiCall(userMessage) {
-        // Guarda a mensagem que o usuário quer enviar
         this.pendingAiMessage = userMessage; 
         
-        // Pega a amostra grande para calcular o tamanho
-        const sampleData = this.getContactDataSample(true); // true = get large sample
-        const sampleJson = JSON.stringify(sampleData);
+        // Calcula o tamanho do *primeiro* lote
+        const firstChunk = this.processedContacts.slice(0, this.aiSearchState.chunkSize);
+        if (firstChunk.length === 0 && this.contacts.length > 0) {
+            this.addMessage("Por favor, mapeie as colunas de Aluno e Telefone primeiro para que eu possa analisar os dados.", 'ai');
+            return;
+        }
+        
+        const sampleJson = JSON.stringify(this.mapContactsForAI(firstChunk));
         
         // Cálculo aproximado de tokens (1 token ~ 4 caracteres)
         const approxTokens = Math.ceil(sampleJson.length / 4);
         
-        // Quantos contatos estão na amostra
-        const sampleCount = sampleData.contact_sample.length;
+        const sampleCount = firstChunk.length;
         const totalCount = this.processedContacts.length;
 
         // Monta a mensagem de confirmação
         const messageHtml = `
-            <p>Sua pergunta precisa ser analisada pela IA juntamente com uma amostra dos seus dados.</p>
-            <ul class="list-disc list-inside text-sm my-3 bg-gray-100 p-3 rounded-md">
-                <li><strong>Amostra a Enviar:</strong> ${sampleCount} de ${totalCount} contatos</li>
-                <li><strong>Tamanho Estimado:</strong> ~${approxTokens} tokens</li>
+            <p>Sua pergunta precisa ser analisada pela IA.</p>
+            <p class="text-sm my-3">A IA irá analisar sua lista em lotes de ${this.aiSearchState.chunkSize} contatos para encontrar a informação (total de ${totalCount} contatos).</p>
+            <ul class="list-disc list-inside text-sm mb-3 bg-gray-100 p-3 rounded-md">
+                <li><strong>Primeiro Lote:</strong> ${sampleCount} contatos</li>
+                <li><strong>Tamanho Estimado (Lote):</strong> ~${approxTokens} tokens</li>
             </ul>
-            <p class="font-bold">Deseja continuar e enviar esta informação para a IA?</p>
+            <p class="font-bold">Deseja iniciar a busca escalável?</p>
             <p class="text-xs text-gray-500 mt-2">(Seus dados de amostra são usados apenas para esta análise e não são armazenados.)</p>
         `;
         
@@ -300,13 +321,159 @@ class WhatsAppBulkManager {
         }
         return false; 
     }
+    
+    // NOVO: Funções de Busca Paginada
+    
+    startPaginatedAiSearch(userMessage) {
+        // Reseta o estado da busca
+        this.aiSearchState = {
+            running: true,
+            query: userMessage,
+            page: 0,
+            chunkSize: 200,
+            foundKeepId: null,
+            foundDeleteIds: [],
+        };
+        
+        this.addMessage(`Iniciando busca escalável... Verificando contatos 1-${this.aiSearchState.chunkSize}.`, 'ai');
+        this.runNextAiSearchPage();
+    }
+    
+    async runNextAiSearchPage() {
+        if (!this.aiSearchState.running) return; // A busca foi parada (ex: encontrou)
+
+        const startIndex = this.aiSearchState.page * this.aiSearchState.chunkSize;
+        const endIndex = startIndex + this.aiSearchState.chunkSize;
+        
+        const sampleChunk = this.processedContacts.slice(startIndex, endIndex);
+
+        // --- CONDIÇÃO DE PARADA: Fim da Lista ---
+        if (sampleChunk.length === 0) {
+            this.aiSearchState.running = false;
+            this.chatStatus.classList.add('hidden');
+
+            if (this.aiSearchState.foundKeepId) {
+                // Isso não deveria acontecer (pois pararia antes), mas é um bom failsafe.
+                this.finalizeComplexDeletion(this.aiSearchState.foundKeepId);
+            } else if (this.aiSearchState.foundDeleteIds.length > 0) {
+                // A busca terminou e encontrou contatos para deletar em várias páginas
+                this.finalizeSimpleDeletion(this.aiSearchState.foundDeleteIds);
+            } else {
+                // A busca terminou e não encontrou nada
+                this.addMessage("Busca escalável concluída. Não encontrei nenhum contato correspondente em *toda* a lista.", 'ai');
+            }
+            return; // Fim do loop
+        }
+        
+        // Mostra o status "digitando"
+        this.chatStatus.classList.remove('hidden');
+
+        // Mapeia os dados do lote para o formato que a IA espera
+        const mappedChunk = this.mapContactsForAI(sampleChunk);
+        
+        // Envia o lote para a IA
+        await this.callChatAPI(this.aiSearchState.query, mappedChunk, this.processedContacts.length);
+    }
+    
+    // Finaliza "remover todos exceto X"
+    finalizeComplexDeletion(keepId) {
+        const indexesToRemove = [];
+        let contactToKeep = null;
+        
+        // Percorre a lista *original*
+        for (let i = 0; i < this.contacts.length; i++) {
+            // O ID é (índice + 1)
+            if (i === (keepId - 1)) {
+                contactToKeep = this.contacts[i];
+            } else {
+                indexesToRemove.push(i);
+            }
+        }
+
+        if (!contactToKeep) {
+            this.showError("Erro: O contato a ser mantido não foi encontrado na lista original.");
+            return;
+        }
+
+        const totalToRemove = indexesToRemove.length;
+        const alunoKey = this.alunoColumn.value;
+        const contactName = this.escapeHtml(contactToKeep[alunoKey] || `ID #${keepId}`);
+
+        const confirmationMessage = `
+            <p>Busca concluída! Encontrei o contato para manter:</p>
+            <div class="text-sm bg-gray-100 p-3 rounded-md my-3">
+                <strong>${contactName} (ID #${keepId})</strong>
+            </div>
+            <p class="font-bold text-red-600">Tem certeza que deseja remover TODOS OS OUTROS ${totalToRemove} contatos?</p>
+        `;
+
+        this.showConfirmationModal(
+            'Remoção em Lote "Todos Exceto"',
+            confirmationMessage,
+            () => {
+                this.removeContactsBatch(indexesToRemove);
+                this.addMessage(`Ok! Removi ${totalToRemove} contatos e mantive "${contactName}".`, 'ai');
+            }
+        );
+    }
+    
+    // Finaliza "remover turma Y"
+    finalizeSimpleDeletion(deleteIds) {
+        const originalIndexesToRemove = deleteIds.map(id => id - 1);
+        const totalToRemove = originalIndexesToRemove.length;
+
+        // Monta a lista de detalhes para confirmação
+        let detailsHtml = '<ul class="list-disc list-inside text-left text-xs bg-gray-100 p-3 rounded-md max-h-40 overflow-y-auto mt-3">';
+        let count = 0;
+        
+        const alunoKey = this.alunoColumn.value;
+        const respKey = this.responsavelColumn.value;
+
+        for (const index of originalIndexesToRemove) {
+            const contact = this.contacts[index]; 
+            if (contact) {
+                if (count < 10) {
+                    const aluno = this.escapeHtml(contact[alunoKey] || 'N/A');
+                    const responsavel = this.escapeHtml(contact[respKey] || 'N/A');
+                    detailsHtml += `<li><strong>${aluno}</strong> (Resp: ${responsavel})</li>`;
+                }
+                count++;
+            }
+        }
+        
+        if (count > 10) {
+             detailsHtml += `<li>... e mais ${count - 10} contato(s).</li>`;
+        }
+        detailsHtml += '</ul>';
+
+        const confirmationMessage = `<p>Busca escalável concluída! A IA encontrou um total de <strong>${totalToRemove} contato(s)</strong> para remoção. Confirma?</p> ${detailsHtml}`;
+        
+        this.showConfirmationModal(
+            'Remoção em Lote via IA',
+            confirmationMessage,
+            () => {
+                this.removeContactsBatch(originalIndexesToRemove);
+                this.addMessage(`Ok! ${totalToRemove} contatos foram removidos.`, 'ai');
+            }
+        );
+    }
+    // --- Fim da Busca Paginada ---
+
 
     addMessage(text, role, isSilent = false) {
-        // ATUALIZAÇÃO: A IA não envia mais botões, removemos a lógica do botão
-        
         let cleanedText = text;
         if (role === 'ai') {
-            cleanedText = text.replace(/[*#]/g, ''); // Remove todos os * e #
+            // Remove as tags de controle da IA antes de exibir
+            cleanedText = text.replace(/\[SEARCH_PAGE_FAIL\]/g, '')
+                              .replace(/\[SEARCH_FOUND_KEEP_ID:\s*\d+\]/g, '')
+                              .replace(/\[SEARCH_FOUND_DELETE_IDS:[\d,\s]+\]/g, '')
+                              .replace(/[*#]/g, '')
+                              .trim();
+        }
+        
+        // Não exiba mensagens de IA vazias (ex: se ela só retornou uma tag)
+        if (role === 'ai' && !cleanedText && !isSilent) {
+            return;
         }
 
         // Limita o histórico
@@ -340,23 +507,16 @@ class WhatsAppBulkManager {
         this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
     }
     
-    // ATUALIZAÇÃO: getContactDataSample agora pode retornar amostra pequena ou grande
-    getContactDataSample(getLargeSample = false) {
-        
-        if (this.contacts.length === 0) return null;
-        
-        const MAX_SAMPLE_SIZE = 200; // Limite da amostra grande
-        const SMALL_SAMPLE_SIZE = 5; // Limite da amostra pequena
-        
+    // ATUALIZAÇÃO: Mapeia um lote de contatos para a IA
+    mapContactsForAI(contactChunk) {
         // Pega as colunas mapeadas para enviar os dados corretos
         const alunoKey = this.alunoColumn.value;
         const respKey = this.responsavelColumn.value;
         const turmaKey = this.turmaColumn.value;
         const phoneKey = this.phoneColumn.value;
 
-        // Helper para formatar o contato
         // USA O ID (índice + 1) DA LISTA PROCESSADA (que vem de this.contacts)
-        const mapContact = (c) => ({
+        return contactChunk.map(c => ({
             id: c.id, // O 'id' aqui é (originalIndex + 1)
             aluno: c.originalData[alunoKey] || '',
             responsavel: c.originalData[respKey] || '',
@@ -364,56 +524,28 @@ class WhatsAppBulkManager {
             telefone_original: c.originalData[phoneKey] || '',
             telefone_formatado: c.cleanedPhone,
             status: c.status
-        });
-
-        // Se for a chamada de confirmação, envia a amostra grande
-        if (getLargeSample) {
-            // Pega os primeiros 200 contatos da lista processada
-            const sample = this.processedContacts.slice(0, MAX_SAMPLE_SIZE).map(mapContact);
-            return {
-                status: "processing_complete",
-                total_contacts: this.processedContacts.length,
-                contact_sample: sample // Envia a lista grande
-            };
-        }
-        
-        // --- Senão, é a chamada de contexto inicial (pequena) ---
-        // (Não está sendo usado no fluxo atual, mas é bom manter)
-        const validContacts = this.processedContacts.filter(c => c.status !== 'invalid');
-        const invalidContacts = this.processedContacts.filter(c => c.status === 'invalid');
-
-        const validSample = validContacts.slice(0, SMALL_SAMPLE_SIZE).map(mapContact);
-        const invalidSample = invalidContacts.slice(0, SMALL_SAMPLE_SIZE * 2).map(mapContact); // 10 inválidos
-
-        const summary = {
-            status: "processing_complete",
-            total_contacts: this.processedContacts.length,
-            total_valid: validContacts.length,
-            total_invalid: invalidContacts.length,
-            invalid_contacts_sample: invalidSample,
-            valid_contacts_sample: validSample
-        };
-        
-        return summary;
+        }));
     }
     
-    async callChatAPI(userMessage) {
-        this.chatStatus.classList.remove('hidden');
+    // ATUALIZAÇÃO: callChatAPI agora faz parte do loop paginado
+    async callChatAPI(userMessage, sampleChunk, totalContacts) {
         
-        // Pega a AMOSTRA GRANDE para enviar
-        const dataSample = this.getContactDataSample(true); // true = get large sample
+        // Monta o payload para este lote
+        const sampleData = {
+            status: "processing_complete",
+            total_contacts: totalContacts,
+            contact_sample: sampleChunk 
+        };
         
-        // O histórico inclui a mensagem atual do usuário (já adicionada via addMessage)
         const historyPayload = this.chatHistory;
         
         const payload = {
             message: userMessage,
             history: historyPayload,
-            contact_data_sample: JSON.stringify(dataSample) // Envia a amostra grande como JSON
+            contact_data_sample: JSON.stringify(sampleData) // Envia o lote atual
         };
 
         try {
-            // Usa o URL base configurado
             const response = await fetch(`${API_BASE_URL}/api/chat`, { 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -422,91 +554,67 @@ class WhatsAppBulkManager {
 
             if (response.status === 429) {
                 this.addMessage('Desculpe, o limite de taxa para o chatbot foi excedido. Tente novamente em 1 hora.', 'ai');
+                this.aiSearchState.running = false; // Para o loop
                 return;
             }
             
             if (!response.ok) {
                  const errorData = await response.json().catch(() => ({ detail: 'Resposta de erro inesperada do servidor.' }));
                  this.addMessage(`Erro da API Chatbot: ${errorData.detail || 'Erro desconhecido.'}`, 'ai');
-                 // Remove a última mensagem do histórico para que o usuário possa tentar novamente sem poluir
-                 this.chatHistory.pop();
+                 this.aiSearchState.running = false; // Para o loop
                  return;
             }
 
             const data = await response.json();
             const aiResponseText = data.response;
+            
+            this.chatStatus.classList.add('hidden'); // Esconde "digitando..."
 
-            // ATUALIZAÇÃO: Verificar se a IA traduziu para [DELETE_IDS: ...]
-            const deleteMatch = aiResponseText.match(/\[DELETE_IDS:\s*([\d,\s]+)\]/);
+            // --- Lógica de Roteamento da Resposta da IA ---
+            
+            const keepMatch = aiResponseText.match(/\[SEARCH_FOUND_KEEP_ID:\s*(\d+)\]/);
+            const deleteMatch = aiResponseText.match(/\[SEARCH_FOUND_DELETE_IDS:\s*([\d,\s]+)\]/);
 
-            if (deleteMatch && deleteMatch[1]) {
-                // A IA quer apagar contatos em LOTE!
-                const idString = deleteMatch[1];
-                const idsToRemove = idString.split(',')
-                    .map(id => parseInt(id.trim()))
-                    .filter(id => !isNaN(id) && id > 0);
+            if (keepMatch) {
+                // FLUXO 1: Encontrou o "Todos Exceto"
+                this.aiSearchState.running = false; // PARA O LOOP
+                this.aiSearchState.foundKeepId = parseInt(keepMatch[1]);
+                this.addMessage(aiResponseText, 'ai'); // Mostra a msg (ex: "Encontrei...")
+                this.finalizeComplexDeletion(this.aiSearchState.foundKeepId);
+
+            } else if (deleteMatch) {
+                // FLUXO 2: Encontrou contatos para deletar NESTE LOTE
+                const idsOnPage = deleteMatch[1].split(',').map(id => parseInt(id.trim()));
+                this.aiSearchState.foundDeleteIds.push(...idsOnPage);
                 
-                // Converte IDs (base 1) para Índices (base 0)
-                const originalIndexesToRemove = idsToRemove.map(id => id - 1);
+                this.addMessage(aiResponseText, 'ai'); // Mostra a msg (ex: "Encontrei 2...")
                 
-                // Pega a mensagem da IA, limpando a tag de deleção
-                const messageToUser = aiResponseText.replace(deleteMatch[0], '').trim();
+                // CONTINUA O LOOP
+                this.aiSearchState.page++;
+                this.runNextAiSearchPage();
 
-                // 1. Adiciona a mensagem da IA (ex: "Entendido, preparei 127 contatos...")
-                this.addMessage(messageToUser, 'ai');
-
-                // 2. Monta a lista de detalhes para confirmação
-                let detailsHtml = '<ul class="list-disc list-inside text-left text-xs bg-gray-100 p-3 rounded-md max-h-40 overflow-y-auto mt-3">';
-                let count = 0;
+            } else if (aiResponseText.includes("[SEARCH_PAGE_FAIL]")) {
+                // FLUXO 3: Não encontrou nada neste lote
+                this.addMessage(aiResponseText, 'ai'); // Mostra a msg (que deve estar vazia)
                 
-                // Pega as colunas mapeadas
-                const alunoKey = this.alunoColumn.value;
-                const respKey = this.responsavelColumn.value;
+                // CONTINUA O LOOP
+                this.aiSearchState.page++;
+                const nextStartIndex = this.aiSearchState.page * this.aiSearchState.chunkSize + 1;
+                const nextEndIndex = nextStartIndex + this.aiSearchState.chunkSize - 1;
+                this.addMessage(`Verificando contatos ${nextStartIndex}-${nextEndIndex}...`, 'ai', true); // Mensagem silenciosa
 
-                for (const index of originalIndexesToRemove) {
-                    const contact = this.contacts[index]; // Pega da lista original
-                    if (contact) {
-                        // Mostra os 10 primeiros, depois "... e mais X"
-                        if (count < 10) {
-                            const aluno = this.escapeHtml(contact[alunoKey] || 'N/A');
-                            const responsavel = this.escapeHtml(contact[respKey] || 'N/A');
-                            detailsHtml += `<li><strong>${aluno}</strong> (Resp: ${responsavel})</li>`;
-                        }
-                        count++;
-                    }
-                }
-                
-                if (count > 10) {
-                     detailsHtml += `<li>... e mais ${count - 10} contato(s).</li>`;
-                }
-                detailsHtml += '</ul>';
+                this.runNextAiSearchPage();
 
-
-                // 3. Pede confirmação
-                if (count > 0) {
-                    // Monta a mensagem final para o modal
-                    const confirmationMessage = `<p>A IA traduziu seu comando e preparou <strong>${count} contato(s)</strong> para remoção em lote. Confirma?</p> ${detailsHtml}`;
-                    
-                    this.showConfirmationModal(
-                        'Remoção em Lote via IA',
-                        confirmationMessage,
-                        () => {
-                            this.removeContactsBatch(originalIndexesToRemove);
-                        }
-                    );
-                }
             } else {
-                // Resposta normal da IA (sem deleção)
+                // FLUXO 4: Resposta de chat normal
+                this.aiSearchState.running = false; // PARA O LOOP
                 this.addMessage(aiResponseText, 'ai');
             }
 
         } catch (error) {
             console.error('Chat API Error:', error);
             this.addMessage('Desculpe, não foi possível conectar ao assistente de AI. Verifique se o backend do Render está ativo.', 'ai');
-            // Remove a última mensagem do histórico em caso de falha de conexão
-            this.chatHistory.pop();
-        } finally {
-            this.chatStatus.classList.add('hidden');
+            this.aiSearchState.running = false; // Para o loop
         }
     }
     
