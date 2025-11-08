@@ -2,122 +2,41 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WhatsApp Bulk Contact Manager & Messenger</title>
+    <meta name="viewport" content="width=device-width, initial-scale-1.0">
+    <title>Disparador de Contatos WhatsApp</title>
+    
+    <!-- Scripts e Fontes Externas -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <style>
-        .drag-over {
-            border-color: #3b82f6 !important;
-            background-color: #eff6ff !important;
-        }
-        .status-valid { color: #10b981; }
-        .status-invalid { color: #ef4444; }
-        .placeholder-highlight {
-            background: linear-gradient(120deg, #3b82f6 0%, #8b5cf6 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-weight: bold;
-        }
-        .progress-bar {
-            transition: width 0.3s ease;
-        }
-        .fade-in {
-            animation: fadeIn 0.5s ease-in;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .table-container {
-            max-height: 400px;
-            overflow-y: auto;
-        }
-        .modal-backdrop {
-            backdrop-filter: blur(4px);
-        }
-        /* Estilos adicionais para o Chatbot */
-        .chat-container {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 1000;
-            width: 90%;
-            max-width: 380px;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-            border-radius: 12px;
-            overflow: hidden;
-        }
-        .chat-window {
-            height: 400px;
-            display: flex;
-            flex-direction: column;
-            background-color: #f7f7f7;
-        }
-        .chat-messages {
-            flex-grow: 1;
-            overflow-y: auto;
-            padding: 15px;
-            scrollbar-width: thin;
-            scrollbar-color: #cbd5e1 #f7f7f7;
-        }
-        .chat-messages::-webkit-scrollbar {
-            width: 8px;
-        }
-        .chat-messages::-webkit-scrollbar-thumb {
-            background-color: #cbd5e1;
-            border-radius: 4px;
-        }
-        .message-bubble {
-            max-width: 85%;
-            padding: 8px 12px;
-            border-radius: 15px;
-            margin-bottom: 10px;
-            line-height: 1.4;
-            word-wrap: break-word;
-            font-size: 0.875rem; /* text-sm */
-        }
-        .user-message {
-            background-color: #0b93f6;
-            color: white;
-            align-self: flex-end;
-            border-bottom-right-radius: 4px;
-        }
-        .ai-message {
-            background-color: #e5e7eb;
-            color: #1f2937;
-            align-self: flex-start;
-            border-bottom-left-radius: 4px;
-        }
-        .ai-message pre {
-            white-space: pre-wrap;
-            margin: 0;
-            font-family: inherit;
-        }
-        /* Corrigindo a cor de status para ícones */
-        .status-invalid i { color: #ef4444; }
-        .status-valid i { color: #10b981; }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- NOVO: CSS agora está em um arquivo separado -->
+    <link rel="stylesheet" href="style.css">
+
 </head>
 <body class="bg-gray-50 min-h-screen">
+    
     <!-- Header -->
-    <header class="bg-white shadow-sm border-b border-gray-200">
+    <header class="main-header">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
                 <div class="flex items-center">
-                    <i class="fab fa-whatsapp text-green-500 text-2xl mr-3"></i>
-                    <h1 class="text-xl font-bold text-gray-900">WhatsApp Bulk Manager</h1>
+                    <i class="fab fa-whatsapp text-green-500 text-3xl mr-3"></i>
+                    <h1 class="text-xl header-title">Disparador de Contatos</h1>
                 </div>
                 <div class="flex items-center space-x-4">
-                    <button id="helpBtn" class="text-gray-500 hover:text-gray-700">
-                        <i class="fas fa-question-circle text-lg"></i>
+                    <button id="helpBtn" title="Ajuda" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-question-circle text-xl"></i>
                     </button>
                     <div class="flex items-center space-x-2">
-                        <span class="text-sm text-gray-500">Modo:</span>
-                        <select id="modeToggle" class="text-sm border border-gray-300 rounded px-2 py-1">
-                            <option value="vcf">Geração VCF</option>
-                            <option value="api">Cloud API</option>
+                        <span class="text-sm text-gray-500">Qual o seu objetivo?</span>
+                        <!-- TEXTO ATUALIZADO (Mais claro) -->
+                        <select id="modeToggle" class="form-select text-sm px-2 py-1">
+                            <option value="vcf">Modo 1: Baixar Contatos (para Celular)</option>
+                            <option value="api">Modo 2: Envio Automático (Avançado)</option>
                         </select>
                     </div>
                 </div>
@@ -127,135 +46,182 @@
 
     <!-- Main Content -->
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- GUIA PASSO A PASSO -->
+        <div class="content-card mb-8">
+            <h2 class="text-lg font-semibold text-gray-900 mb-6 text-center">Comece por aqui - Guia Rápido</h2>
+            <div class="step-guide-container">
+
+                <!-- Passo 1 -->
+                <div class="step-card">
+                    <div class="step-icon primary">
+                        <i class="fas fa-file-excel"></i>
+                    </div>
+                    <div class="step-text">
+                        <h3>Passo 1: Envie</h3>
+                        <p>Envie sua planilha Excel ou CSV com os contatos.</p>
+                    </div>
+                </div>
+
+                <!-- Passo 2 -->
+                <div class="step-card">
+                    <div class="step-icon primary">
+                        <i class="fas fa-list-check"></i>
+                    </div>
+                    <div class="step-text">
+                        <h3>Passo 2: Verifique</h3>
+                        <p>Confirme se a IA acertou as colunas de Nome e Telefone.</p>
+                    </div>
+                </div>
+
+                <!-- Passo 3 -->
+                <div class="step-card">
+                    <div class="step-icon primary">
+                        <i class="fas fa-pen-to-square"></i>
+                    </div>
+                    <div class="step-text">
+                        <h3>Passo 3: Escreva</h3>
+                        <p>Crie sua mensagem. Use {name} para personalizar.</p>
+                    </div>
+                </div>
+
+                <!-- Passo 4 (TEXTO ATUALIZADO) -->
+                <div class="step-card">
+                    <div class="step-icon secondary">
+                        <i class="fas fa-paper-plane"></i>
+                    </div>
+                    <div class="step-text">
+                        <h3>Passo 4: Ação Final</h3>
+                        <p>Escolha como salvar ou enviar seus contatos.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Upload Section -->
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">Carregar Arquivo de Contatos</h2>
+        <div class="content-card">
+            <h2 class="card-title">Passo 1: Envie sua Planilha</h2>
             
-            <!-- Drag and Drop Zone -->
-            <div id="dropZone" class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-400 transition-colors">
-                <i class="fas fa-cloud-upload-alt text-4xl text-gray-400 mb-4"></i>
+            <div id="dropZone">
+                <i class="fas fa-cloud-upload-alt"></i>
                 <p class="text-lg font-medium text-gray-700 mb-2">Arraste seu arquivo Excel ou CSV aqui</p>
-                <p class="text-sm text-gray-500 mb-4">ou clique para procurar arquivos</p>
-                <button id="browseBtn" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-                    Escolher Arquivo
+                <p class="text-sm text-gray-500 mb-4">ou clique para procurar no computador</p>
+                <button id="browseBtn" class="btn btn-primary">
+                    <i class="fas fa-folder-open mr-2"></i>Escolher Arquivo
                 </button>
                 <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" class="hidden">
             </div>
 
             <!-- File Info -->
             <div id="fileInfo" class="mt-4 hidden">
-                <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4">
+                <div class="flex items-center justify-between bg-gray-50 rounded-lg p-4 border border-gray-200">
                     <div class="flex items-center">
-                        <i class="fas fa-file-excel text-green-600 text-xl mr-3"></i>
+                        <i class="fas fa-file-excel text-green-600 text-2xl mr-4"></i>
                         <div>
                             <p id="fileName" class="font-medium text-gray-900"></p>
                             <p id="fileSize" class="text-sm text-gray-500"></p>
                         </div>
                     </div>
-                    <button id="removeFile" class="text-red-600 hover:text-red-700">
-                        <i class="fas fa-times"></i>
+                    <button id="removeFile" class="btn-danger-icon" title="Remover arquivo">
+                        <i class="fas fa-times-circle"></i>
                     </button>
                 </div>
             </div>
         </div>
 
         <!-- Column Mapping Section -->
-        <div id="mappingSection" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6 hidden">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-semibold text-gray-900">Mapeamento de Colunas</h2>
-                <!-- O botão foi removido e a detecção é automática no main.js -->
+        <div id="mappingSection" class="content-card hidden">
+            <h2 class="card-title">Passo 2: Verifique as Colunas</h2>
+            <p class="text-sm text-gray-500 -mt-6 mb-4">A IA tentou adivinhar. Por favor, confirme se está correto.</p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Coluna do Aluno (Nome Principal) -->
+                <div>
+                    <label class="form-label font-bold text-gray-800" for="alunoColumn">Qual coluna tem o NOME DO ALUNO? (Principal)</label>
+                    <select id="alunoColumn" class="form-select">
+                        <option value="">Selecione a coluna...</option>
+                    </select>
+                </div>
+                <!-- Coluna do Telefone -->
+                <div>
+                    <label class="form-label font-bold text-gray-800" for="phoneColumn">Qual coluna tem o NÚMERO DE TELEFONE?</label>
+                    <select id="phoneColumn" class="form-select">
+                        <option value="">Selecione a coluna...</option>
+                    </select>
+                </div>
             </div>
             
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <!-- Coluna do Nome foi substituída pela Coluna do Aluno para o "name" do template -->
+            <!-- Campos Opcionais -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 border-t border-gray-200 pt-6">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Coluna do Aluno (Nome Principal)</label>
-                    <select id="alunoColumn" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                    <label class="form-label" for="responsavelColumn">Qual coluna tem o nome do RESPONSÁVEL? (Opcional)</label>
+                    <select id="responsavelColumn" class="form-select">
                         <option value="">Selecione a coluna...</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Coluna do Telefone</label>
-                    <select id="phoneColumn" class="w-full border border-gray-300 rounded-lg px-3 py-2">
-                        <option value="">Selecione a coluna...</option>
-                    </select>
-                </div>
-            </div>
-            
-            <!-- Novos Selects para identificar os campos obrigatórios para o relatório de erros -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Coluna do Responsável</label>
-                    <select id="responsavelColumn" class="w-full border border-gray-300 rounded-lg px-3 py-2">
-                        <option value="">Selecione a coluna...</option>
-                    </select>
-                </div>
-                <div>
-                    <!-- Coluna do Aluno original foi movida para o topo para ser o "nameColumn" -->
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Coluna da Turma</label>
-                    <select id="turmaColumn" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                    <label class="form-label" for="turmaColumn">Qual coluna tem a TURMA? (Opcional)</label>
+                    <select id="turmaColumn" class="form-select">
                         <option value="">Selecione a coluna...</option>
                     </select>
                 </div>
             </div>
-
 
             <!-- AI Detection Status -->
-            <div id="aiStatus" class="mt-4 hidden">
-                <div class="flex items-center p-3 bg-blue-50 rounded-lg">
-                    <i class="fas fa-robot text-blue-600 mr-2"></i>
+            <div id="aiStatus" class="mt-6 hidden">
+                <div class="flex items-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <i class="fas fa-robot text-blue-600 mr-3"></i>
                     <span class="text-sm text-blue-800">AI detectou e mapeou colunas automaticamente.</span>
                 </div>
             </div>
         </div>
 
         <!-- Contact Preview Section -->
-        <div id="previewSection" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6 hidden">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-semibold text-gray-900">Prévia dos Contatos</h2>
+        <div id="previewSection" class="content-card hidden">
+            <div class="flex justify-between items-center -mt-2 mb-4">
+                <h2 class="card-title mb-0 border-none p-0">Prévia da Validação</h2>
                 <div class="flex items-center space-x-4 text-sm">
-                    <span class="status-valid">🟢 Válido</span>
-                    <span class="status-invalid">🔴 Inválido</span>
+                    <span class="status-valid"><i class="fas fa-check-circle mr-1"></i>Válido</span>
+                    <span class="status-invalid"><i class="fas fa-times-circle mr-1"></i>Inválido</span>
                 </div>
             </div>
             
-            <!-- Texto de prévia atualizado no main.js -->
-            <div class="mb-4">
-                <p class="text-sm text-gray-600">Mostrando os primeiros 200 de <span id="totalContacts">0</span> contatos. Contatos <span class="font-bold status-invalid">inválidos</span> são movidos para o final da lista. (Edite a tabela diretamente)</p>
+            <div class="mb-4 bg-gray-50 p-3 rounded-lg border">
+                <p class="text-sm text-gray-600">Mostrando os primeiros 200 de <span id="totalContacts" class="font-bold">0</span> contatos. Contatos <span class="font-bold status-invalid">inválidos</span> são movidos para o final da lista.</p>
             </div>
 
             <div class="table-container">
                 <table class="w-full text-sm">
-                    <thead class="bg-gray-50 sticky top-0">
+                    <thead class="table-header">
                         <tr>
-                            <th class="px-4 py-2 text-left font-medium text-gray-700">#</th>
-                            <th class="px-4 py-2 text-left font-medium text-gray-700">Aluno (Nome)</th>
-                            <th class="px-4 py-2 text-left font-medium text-gray-700">Responsável</th>
-                            <th class="px-4 py-2 text-left font-medium text-gray-700">Turma</th>
-                            <th class="px-4 py-2 text-left font-medium text-gray-700">Telefone (Formatado)</th>
-                            <th class="px-4 py-2 text-left font-medium text-gray-700">DDD</th>
-                            <th class="px-4 py-2 text-left font-medium text-gray-700">Status</th>
-                            <th class="px-4 py-2 text-left font-medium text-gray-700">Ação</th>
+                            <th>#</th>
+                            <th>Aluno (Nome)</th>
+                            <th>Responsável</th>
+                            <th>Turma</th>
+                            <th>Telefone (Original/Formatado)</th>
+                            <th>DDD</th>
+                            <th>Status</th>
+                            <th>Ação</th>
                         </tr>
                     </thead>
                     <tbody id="contactTable" class="divide-y divide-gray-200">
-                        <!-- Contacts will be populated here -->
+                        <!-- Linhas da tabela serão populadas pelo JS -->
                     </tbody>
                 </table>
             </div>
         </div>
 
         <!-- Message Composer Section -->
-        <div id="messageSection" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6 hidden">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">Modelo de Mensagem</h2>
+        <div id="messageSection" class="content-card hidden">
+            <h2 class="card-title">Passo 3: Escreva sua Mensagem</h2>
             
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Modelo de Mensagem</label>
-                    <textarea id="messageTemplate" rows="4" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="Olá {name}, esta é uma mensagem da nossa empresa..."></textarea>
+                    <label class="form-label" for="messageTemplate">Sua mensagem:</label>
+                    <textarea id="messageTemplate" rows="5" class="form-textarea" placeholder="Olá {name}, esta é uma mensagem da nossa escola..."></textarea>
                     <div class="flex justify-between items-center mt-2">
                         <div class="text-xs text-gray-500">
-                            Use <span class="placeholder-highlight">{name}</span> e <span class="placeholder-highlight">{custom_field}</span> para personalização
+                            Use <span class="placeholder-highlight">{name}</span> para o nome do aluno.
                         </div>
                         <div class="text-xs text-gray-500">
                             <span id="charCount">0</span>/4096 caracteres
@@ -263,67 +229,91 @@
                     </div>
                 </div>
 
-                <div class="bg-gray-50 rounded-lg p-4">
-                    <h3 class="text-sm font-medium text-gray-700 mb-2">Prévia (primeiro contato)</h3>
-                    <div id="messagePreview" class="text-sm text-gray-600 bg-white p-3 rounded border">
+                <div class="bg-gray-50 rounded-lg p-4 border">
+                    <h3 class="text-sm font-medium text-gray-700 mb-2">Prévia (como o primeiro contato verá):</h3>
+                    <div id="messagePreview" class="text-sm text-gray-800 bg-white p-3 rounded border border-gray-300 min-h-[50px]">
                         <!-- Preview will be shown here -->
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- API Configuration Section -->
-        <div id="apiConfigSection" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6 hidden">
-            <h2 class="text-lg font-semibold text-gray-900 mb-4">Configuração do WhatsApp Cloud API</h2>
+        <!-- API Configuration Section (TEXTO ATUALIZADO) -->
+        <div id="apiConfigSection" class="content-card hidden">
+            <h2 class="card-title">Passo 3.5: Configurar Envio Automático (Modo API)</h2>
+            <p class="text-sm text-gray-500 -mt-6 mb-4">Este passo é técnico. Preencha isto *apenas* se você escolheu o "Modo 2: Envio Automático".</p>
             
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Token de Acesso</label>
-                    <input type="password" id="accessToken" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="EAAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+                    <label class="form-label" for="accessToken">Token de Acesso da API</label>
+                    <input type="password" id="accessToken" class="form-input" placeholder="EAAxxxxxxxx... (segredo)">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">ID do Número de Telefone</label>
-                    <input type="text" id="phoneNumberId" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="123456789012345">
+                    <label class="form-label" for="phoneNumberId">ID do Número de Telefone</label>
+                    <input type="text" id="phoneNumberId" class="form-input" placeholder="123456789012345">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Nome do Template</label>
-                    <input type="text" id="templateName" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="hello_world">
+                    <label class="form-label" for="templateName">Nome do Template (Opcional)</label>
+                    <input type="text" id="templateName" class="form-input" placeholder="ex: hello_world">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Código do Idioma</label>
-                    <select id="languageCode" class="w-full border border-gray-300 rounded-lg px-3 py-2">
-                        <option value="en">Inglês</option>
+                    <label class="form-label" for="languageCode">Código do Idioma (do template)</label>
+                    <select id="languageCode" class="form-select">
                         <option value="pt_BR">Português (Brasil)</option>
+                        <option value="en">Inglês</option>
                         <option value="es">Espanhol</option>
                         <option value="fr">Francês</option>
                     </select>
                 </div>
             </div>
 
-            <div class="mt-4 p-3 bg-yellow-50 rounded-lg">
+            <div class="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
                 <div class="flex items-start">
-                    <i class="fas fa-exclamation-triangle text-yellow-600 mt-0.5 mr-2"></i>
+                    <i class="fas fa-exclamation-triangle text-yellow-600 mt-0.5 mr-3"></i>
                     <div class="text-sm text-yellow-800">
                         <p class="font-medium">Aviso de Segurança</p>
-                        <p>Suas credenciais de API são armazenadas apenas na sua sessão do navegador e nunca são enviadas aos nossos servidores.</p>
+                        <p>Suas credenciais de API são armazenadas apenas no seu navegador e nunca são enviadas ao nosso servidor.</p>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Action Buttons -->
-        <div id="actionSection" class="flex justify-center space-x-4 hidden">
-            <button id="generateVcfBtn" class="bg-green-600 text-white px-8 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium">
-                <i class="fas fa-download mr-2"></i>Gerar Arquivo VCF
-            </button>
-            <button id="sendMessagesBtn" class="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium">
-                <i class="fas fa-paper-plane mr-2"></i>Enviar Mensagens
-            </button>
+        <!-- Action Buttons (SEÇÃO ATUALIZADA) -->
+        <div id="finalStepSection" class="content-card hidden">
+            <h2 class="card-title">Passo 4: Escolha sua Ação Final</h2>
+            
+            <!-- Modo 1: VCF (Baixar Contatos) -->
+            <div id="vcfModeExplanation" class="mode-explanation">
+                <div class="flex items-center mb-2">
+                    <i class="fas fa-address-book text-secondary-color text-2xl mr-3"></i>
+                    <h3>Modo 1: Baixar Contatos (para Celular)</h3>
+                </div>
+                <p>
+                    Isso cria um arquivo mágico de "Contatos" (chamado VCF). Você envia esse arquivo para o seu celular, abre ele, e <strong>todos os contatos válidos são salvos na sua agenda de uma só vez!</strong> É como adicionar 100 amigos de uma vez só.
+                </p>
+                <button id="generateVcfBtn" class="btn btn-secondary text-base px-8 py-3">
+                    <i class="fas fa-download mr-2"></i>Baixar Arquivo de Contatos
+                </button>
+            </div>
+
+            <!-- Modo 2: API (Envio Automático) -->
+            <div id="apiModeExplanation" class="mode-explanation" style="display: none;">
+                <div class="flex items-center mb-2">
+                     <i class="fas fa-robot text-primary-color text-2xl mr-3"></i>
+                    <h3>Modo 2: Envio Automático (Avançado)</h3>
+                </div>
+                <p>
+                    Isso usa uma ferramenta profissional (API) para <strong>enviar sua mensagem automaticamente</strong> para cada contato válido, um por um, direto no WhatsApp. Você não precisa fazer mais nada. (Requer a configuração técnica no Passo 3.5).
+                </p>
+                <button id="sendMessagesBtn" class="btn btn-primary text-base px-8 py-3">
+                    <i class="fas fa-paper-plane mr-2"></i>Enviar Mensagens Automáticas
+                </button>
+            </div>
         </div>
     </main>
 
     <!-- Chatbot Floating Button -->
-    <button id="chatToggleBtn" class="fixed bottom-6 right-6 bg-purple-600 text-white p-4 rounded-full shadow-lg hover:bg-purple-700 transition-all z-1000">
+    <button id="chatToggleBtn" class="fixed bottom-6 right-6 p-4 rounded-full shadow-lg transition-all z-1000" title="Ajuda da IA">
         <i class="fas fa-robot text-xl"></i>
     </button>
 
@@ -331,9 +321,9 @@
     <div id="chatContainer" class="chat-container hidden">
         <div class="chat-window rounded-lg">
             <!-- Chat Header -->
-            <div class="flex justify-between items-center bg-purple-700 text-white p-3 rounded-t-lg">
+            <div class="chat-header flex justify-between items-center">
                 <h3 class="font-semibold text-sm">Ajudante Geral a AI</h3>
-                <button id="chatCloseBtn" class="text-white hover:text-gray-300 p-1">
+                <button id="chatCloseBtn" class="text-white hover:text-gray-200 p-1">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -347,8 +337,8 @@
                     <i class="fas fa-spinner fa-spin mr-1"></i> A AI está digitando...
                 </div>
                 <form id="chatForm" class="flex">
-                    <input type="text" id="chatInput" class="flex-grow border border-gray-300 rounded-l-lg p-2 text-sm focus:outline-none focus:border-purple-500" placeholder="Pergunte sobre seus contatos ou sobre o site...">
-                    <button type="submit" id="chatSendBtn" class="bg-purple-600 text-white p-2 rounded-r-lg hover:bg-purple-700 transition-colors disabled:opacity-50">
+                    <input type="text" id="chatInput" class="form-input rounded-r-none" placeholder="Pergunte sobre seus contatos...">
+                    <button type="submit" id="chatSendBtn" class="btn btn-primary rounded-l-none">
                         <i class="fas fa-paper-plane"></i>
                     </button>
                 </form>
@@ -357,8 +347,8 @@
     </div>
 
     <!-- Progress Modal -->
-    <div id="progressModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop hidden flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+    <div id="progressModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop hidden flex items-center justify-center z-50 p-4">
+        <div class="modal-content w-full max-w-md">
             <div class="flex justify-between items-center mb-4">
                 <h3 id="progressTitle" class="text-lg font-semibold text-gray-900">Processando Contatos</h3>
                 <button id="closeProgress" class="text-gray-400 hover:text-gray-600">
@@ -367,25 +357,25 @@
             </div>
             
             <div class="space-y-4">
-                <div class="flex justify-between text-sm">
+                <div class="flex justify-between text-sm font-medium">
                     <span id="progressText">Processando...</span>
                     <span id="progressCount">0/0</span>
                 </div>
                 
-                <div class="w-full bg-gray-200 rounded-full h-2">
-                    <div id="progressBar" class="progress-bar bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
+                <div class="w-full progress-bar-bg rounded-full h-2.5">
+                    <div id="progressBar" class="progress-bar h-2.5 rounded-full" style="width: 0%"></div>
                 </div>
                 
-                <div id="progressDetails" class="text-sm text-gray-600 space-y-1">
+                <div id="progressDetails" class="text-sm text-gray-600 space-y-1 max-h-32 overflow-y-auto">
                     <!-- Progress details will be shown here -->
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Help Modal -->
-    <div id="helpModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop hidden flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+    <!-- Help Modal (TEXTO ATUALIZADO) -->
+    <div id="helpModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop hidden flex items-center justify-center z-50 p-4">
+        <div class="modal-content w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-semibold text-gray-900">Ajuda e Instruções</h3>
                 <button id="closeHelp" class="text-gray-400 hover:text-gray-600">
@@ -395,47 +385,40 @@
             
             <div class="space-y-6">
                 <div>
-                    <h4 class="font-medium text-gray-900 mb-2">Como Usar</h4>
+                    <h4 class="font-medium text-gray-900 mb-2">Como Usar (O Básico)</h4>
                     <ol class="list-decimal list-inside space-y-2 text-sm text-gray-600">
-                        <li>Carregue um arquivo Excel (.xlsx, .xls) ou CSV contendo seus contatos</li>
-                        <li>O mapeamento das colunas é automático via AI após o upload.</li>
-                        <li>Pré-visualize seus contatos e verifique a formatação do número de telefone</li>
-                        <li>Use o Chatbot de AI (<i class="fas fa-robot"></i> no canto inferior direito) para tirar dúvidas sobre seus dados ou o site.</li>
-                        <li>Escolha seu método preferido:</li>
-                        <li class="ml-4">Geração VCF: Cria um arquivo de contato para importação no telefone</li>
-                        <li class="ml-4">Cloud API: Envia mensagens diretamente via WhatsApp Business API</li>
-                        <li>Configure o modelo de mensagem com placeholders como {name}</li>
-                        <li>Processe seus contatos e baixe/envie mensagens</li>
+                        <li><strong>Passo 1:</strong> Carregue um arquivo Excel (.xlsx, .xls) ou CSV.</li>
+                        <li><strong>Passo 2:</strong> O site tentará adivinhar as colunas de "Nome do Aluno" e "Telefone". Confira se estão corretas. Se não estiverem, selecione as colunas certas manualmente.</li>
+                        <li><strong>Passo 3:</strong> Escreva a mensagem que você quer enviar. Use `{name}` onde você quiser que o nome do aluno apareça.</li>
+                        <li><strong>Passo 4 (Escolha o Modo):</strong> No topo da página, escolha seu objetivo:</li>
                     </ol>
+                    
+                    <div class="mt-4 pl-8 space-y-3">
+                        <div class="p-3 bg-gray-50 rounded-lg border">
+                            <h5 class="font-semibold text-gray-800">Modo 1: Baixar Contatos (VCF)</h5>
+                            <p class="text-sm text-gray-600">Isso cria um arquivo `.vcf`. Envie este arquivo para o seu celular e abra-o para salvar <strong>todos os contatos de uma vez</strong> na sua agenda.</p>
+                        </div>
+                         <div class="p-3 bg-gray-50 rounded-lg border">
+                            <h5 class="font-semibold text-gray-800">Modo 2: Envio Automático (API)</h5>
+                            <p class="text-sm text-gray-600">Se você tem credenciais da API do WhatsApp Business, preencha o "Passo 3.5" e clique em "Enviar Mensagens" para disparar automaticamente.</p>
+                        </div>
+                    </div>
                 </div>
                 
                 <div>
-                    <h4 class="font-medium text-gray-900 mb-2">Formato do Arquivo</h4>
-                    <p class="text-sm text-gray-600 mb-2">Seu arquivo Excel/CSV deve conter pelo menos estas colunas:</p>
+                    <h4 class="font-medium text-gray-900 mb-2">Sobre os Números de Telefone</h4>
+                    <p class="text-sm text-gray-600">O sistema limpa e formata automaticamente os números de telefone para o padrão brasileiro (+55, DDD, e o 9 na frente).</p>
                     <ul class="list-disc list-inside space-y-1 text-sm text-gray-600">
-                        <li>Nome do Aluno (usado como nome principal)</li>
-                        <li>Nome do Responsável</li>
-                        <li>Turma</li>
-                        <li>Telefone</li>
-                        <li>Opcional: Campos personalizados adicionais</li>
-                    </ul>
-                </div>
-
-                <div>
-                    <h4 class="font-medium text-gray-900 mb-2">Formato do Número de Telefone</h4>
-                    <p class="text-sm text-gray-600">O sistema formata automaticamente os números de telefone para o padrão E.164: +55 + DDD + 9 + 8 dígitos.</p>
-                    <ul class="list-disc list-inside space-y-1 text-sm text-gray-600">
-                        <li>Números que resultarem em **menos de 8 dígitos** após a limpeza são marcados como **Inválidos**.</li>
+                        <li>Números que não tiverem DDD ou tiverem dígitos de menos (menos de 10 dígitos no total) serão marcados como <strong>Inválidos</strong> e não serão processados.</li>
                     </ul>
                 </div>
 
                 <div>
                     <h4 class="font-medium text-gray-900 mb-2">Segurança e Privacidade</h4>
                     <ul class="list-disc list-inside space-y-1 text-sm text-gray-600">
-                        <li>Todo o processamento ocorre no seu navegador</li>
-                        <li>Os dados de contato nunca saem do seu dispositivo (modo VCF)</li>
-                        <li>As credenciais da API são armazenadas apenas no armazenamento de sessão</li>
-                        <li>Nenhum dado é armazenado em nossos servidores</li>
+                        <li><strong>Tudo acontece no seu navegador.</strong></li>
+                        <li>Seus contatos e sua lista NUNCA saem do seu computador.</li>
+                        <li>Nenhum dado é salvo em nossos servidores. É 100% privado.</li>
                     </ul>
                 </div>
             </div>
@@ -446,11 +429,12 @@
     <footer class="bg-white border-t border-gray-200 mt-12">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div class="text-center text-sm text-gray-500">
-                <p>&copy; 2024 WhatsApp Bulk Contact Manager. Construído com arquitetura de privacidade em primeiro lugar.</p>
+                <p>&copy; 2024 Disparador de Contatos. Construído com foco total em privacidade.</p>
             </div>
         </div>
     </footer>
 
+    <!-- Script Principal do App -->
     <script src="main.js"></script>
 </body>
 </html>
