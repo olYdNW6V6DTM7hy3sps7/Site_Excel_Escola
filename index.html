@@ -13,7 +13,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <!-- NOVO: CSS agora está em um arquivo separado -->
+    <!-- CSS (style.css) -->
     <link rel="stylesheet" href="style.css">
 
 </head>
@@ -33,7 +33,6 @@
                     </button>
                     <div class="flex items-center space-x-2">
                         <span class="text-sm text-gray-500">Qual o seu objetivo?</span>
-                        <!-- TEXTO ATUALIZADO (Mais claro) -->
                         <select id="modeToggle" class="form-select text-sm px-2 py-1">
                             <option value="vcf">Modo 1: Baixar Contatos (para Celular)</option>
                             <option value="api">Modo 2: Envio Automático (Avançado)</option>
@@ -85,7 +84,7 @@
                     </div>
                 </div>
 
-                <!-- Passo 4 (TEXTO ATUALIZADO) -->
+                <!-- Passo 4 -->
                 <div class="step-card">
                     <div class="step-icon secondary">
                         <i class="fas fa-paper-plane"></i>
@@ -102,8 +101,9 @@
                 <i class="fas fa-robot text-primary-color text-2xl mb-2"></i>
                 <h4 class="font-semibold text-gray-800">Precisa de Ajuda?</h4>
                 <p class="text-sm text-neutral-text">
+                    <!-- ATUALIZAÇÃO: Texto adicionado conforme solicitado -->
                     Se tiver qualquer dúvida, clique no <span class="font-bold text-primary-color">robozinho roxo</span>
-                    no canto da tela. Ele te ajuda em tudo!
+                    no canto da tela. Ele te auxiliará em tudo!
                 </p>
             </div>
             <!-- FIM DO BLOCO -->
@@ -166,6 +166,7 @@
             <!-- Campos Opcionais -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 border-t border-gray-200 pt-6">
                 <div>
+                    <!-- ATUALIZAÇÃO: Nome da coluna do responsável -->
                     <label class="form-label" for="responsavelColumn">Qual coluna tem o nome do RESPONSÁVEL? (Opcional)</label>
                     <select id="responsavelColumn" class="form-select">
                         <option value="">Selecione a coluna...</option>
@@ -231,11 +232,12 @@
                 <div>
                     <label class="form-label" for="messageTemplate">Sua mensagem:</label>
                     <!--
-                        PROTEÇÃO (Anti-Hacking: XSS):
-                        A entrada do usuário aqui (template) é segura porque
-                        o `main.js` NUNCA a insere como HTML. Ele a usa para
+                        COMENTÁRIO DE SEGURANÇA (Anti-Hacking: XSS):
+                        A entrada do usuário aqui (template) é segura.
+                        O `main.js` NUNCA a insere como HTML puro. Ele a usa para
                         gerar a PRÉVIA, mas higieniza a prévia usando
-                        `.textContent` (veja `updateMessagePreview` no main.js).
+                        `.textContent` (veja `updateMessagePreview` no main.js),
+                        o que previne ataques de Cross-Site Scripting (XSS).
                     -->
                     <textarea id="messageTemplate" rows="5" class="form-textarea" placeholder="Olá {name}, esta é uma mensagem da nossa escola..."></textarea>
                     <div class="flex justify-between items-center mt-2">
@@ -257,7 +259,7 @@
             </div>
         </div>
 
-        <!-- API Configuration Section (TEXTO ATUALIZADO) -->
+        <!-- API Configuration Section -->
         <div id="apiConfigSection" class="content-card hidden">
             <h2 class="card-title">Passo 3.5: Configurar Envio Automático (Modo API)</h2>
             <p class="text-sm text-gray-500 -mt-6 mb-4">Este passo é técnico. Preencha isto *apenas* se você escolheu o "Modo 2: Envio Automático".</p>
@@ -265,7 +267,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <!--
-                        PROTEÇÃO (LGPD: Senhas e Autenticação):
+                        COMENTÁRIO DE SEGURANÇA (LGPD: Senhas e Autenticação / Eng. Social):
                         Usamos `type="password"` para mascarar o token de acesso.
                         Isso impede que alguém veja o token "por cima do ombro"
                         (Engenharia Social).
@@ -298,7 +300,7 @@
                     <div class="text-sm text-yellow-800">
                         <p class="font-medium">Aviso de Segurança (LGPD: Retenção de Dados)</p>
                         <!--
-                            PROTEÇÃO (LGPD: Senhas e Autenticação):
+                            COMENTÁRIO DE SEGURANÇA (LGPD: Senhas e Autenticação):
                             Informamos ao usuário (Princípio da Transparência)
                             que sua "senha" (token) é salva no `sessionStorage`
                             (veja main.js, função `saveApiConfig`), que é
@@ -310,7 +312,7 @@
             </div>
         </div>
 
-        <!-- Action Buttons (SEÇÃO ATUALIZADA) -->
+        <!-- Action Buttons -->
         <div id="finalStepSection" class="content-card hidden">
             <h2 class="card-title">Passo 4: Escolha sua Ação Final</h2>
             
@@ -321,7 +323,7 @@
                     <h3>Modo 1: Baixar Contatos (para Celular)</h3>
                 </div>
                 <!--
-                    PROTEÇÃO (LGPD: Minimização de Dados):
+                    COMENTÁRIO DE SEGURANÇA (LGPD: Minimização de Dados):
                     Explicamos que este modo é 100% offline.
                     Os dados do usuário NUNCA tocam a internet.
                     Esta é a melhor proteção de privacidade possível.
@@ -341,7 +343,7 @@
                     <h3>Modo 2: Envio Automático (Avançado)</h3>
                 </div>
                 <!--
-                    PROTEÇÃO (LGPD: Transparência):
+                    COMENTÁRIO DE SEGURANÇA (LGPD: Transparência):
                     Explicamos que este modo *usa* a internet e envia
                     os dados para o backend (que os repassa para o WhatsApp).
                 -->
@@ -372,7 +374,12 @@
             </div>
             <!-- Messages -->
             <div id="chatMessages" class="chat-messages flex flex-col space-y-2">
-                <!-- As mensagens são inseridas aqui via main.js, função addMessage(), que usa escapeHtml() para proteção XSS. -->
+                <!-- 
+                    COMENTÁRIO DE SEGURANÇA (Anti-Hacking: XSS):
+                    As mensagens são inseridas aqui via main.js, função addMessage(), 
+                    que usa escapeHtml() para higienizar o texto antes de inseri-lo,
+                    prevenindo ataques XSS.
+                -->
             </div>
             <!-- Input -->
             <div class="p-3 border-t border-gray-200 bg-white">
@@ -415,48 +422,50 @@
             </div>
         </div>
     </div>
+    
+    <!-- NOVO: Confirmation Modal (para remoção) -->
+    <div id="confirmationModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop hidden flex items-center justify-center z-50 p-4">
+        <div class="modal-content w-full max-w-md">
+            <h3 id="confirmTitle" class="text-lg font-semibold text-gray-900 mb-4">Confirmar Remoção</h3>
+            <p id="confirmText" class="text-sm text-gray-600 mb-6">Tem certeza que deseja remover este contato da lista?</p>
+            
+            <div class="flex justify-end space-x-3">
+                <button id="confirmCancelBtn" class="btn bg-gray-200 text-gray-800 hover:bg-gray-300">
+                    Cancelar
+                </button>
+                <button id="confirmActionBtn" class="btn btn-primary bg-red-600 hover:bg-red-700">
+                    Remover
+                </button>
+            </div>
+        </div>
+    </div>
 
-    <!-- Help Modal (TEXTO ATUALIZADO COM TODAS AS PROTEÇÕES) -->
+
+    <!-- Help Modal (ATUALIZADO COM TODAS AS PROTEÇÕES SOLICITADAS) -->
     <div id="helpModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop hidden flex items-center justify-center z-50 p-4">
-        <div class="modal-content w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="modal-content w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold text-gray-900">Ajuda e Instruções</h3>
+                <h3 class="text-lg font-semibold text-gray-900">Ajuda, Segurança e Conformidade (LGPD)</h3>
                 <button id="closeHelp" class="text-gray-400 hover:text-gray-600">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             
             <div class="space-y-6">
+                <!-- Seção de Instruções -->
                 <div>
                     <h4 class="font-medium text-gray-900 mb-2">Como Usar (O Básico)</h4>
                     <ol class="list-decimal list-inside space-y-2 text-sm text-gray-600">
                         <li><strong>Passo 1:</strong> Carregue um arquivo Excel (.xlsx, .xls) ou CSV.</li>
-                        <li><strong>Passo 2:</strong> O site tentará adivinhar as colunas de "Nome do Aluno" e "Telefone". Confira se estão corretas. Se não estiverem, selecione as colunas certas manualmente.</li>
-                        <li><strong>Passo 3:</strong> Escreva a mensagem que você quer enviar. Use `{name}` onde você quiser que o nome do aluno apareça.</li>
-                        <li><strong>Passo 4 (Escolha o Modo):</strong> No topo da página, escolha seu objetivo:</li>
+                        <li><strong>Passo 2:</strong> O site tentará adivinhar as colunas. Confira se "Nome do Aluno" e "Telefone" estão corretos.</li>
+                        <li><strong>Ajuda da IA:</strong> A qualquer momento, clique no <strong>robô roxo</strong> para tirar dúvidas sobre seus dados ou sobre o site.</li>
+                        <li><strong>Remover Contato:</strong> Você pode clicar no ícone de lixeira (<i class="fas fa-trash-alt"></i>) na tabela para remover um contato, ou pedir à IA (ex: "Remover contato João da Silva").</li>
+                        <li><strong>Passo 3:</strong> Escreva a mensagem. Use `{name}` para o nome do aluno.</li>
+                        <li><strong>Passo 4 (Escolha o Modo):</strong> No topo da página, escolha seu objetivo (Modo 1 ou Modo 2).</li>
                     </ol>
-                    
-                    <div class="mt-4 pl-8 space-y-3">
-                        <div class="p-3 bg-gray-50 rounded-lg border">
-                            <h5 class="font-semibold text-gray-800">Modo 1: Baixar Contatos (VCF)</h5>
-                            <p class="text-sm text-gray-600">Isso cria um arquivo `.vcf`. Envie este arquivo para o seu celular e abra-o para salvar <strong>todos os contatos de uma vez</strong> na sua agenda.</p>
-                        </div>
-                         <div class="p-3 bg-gray-50 rounded-lg border">
-                            <h5 class="font-semibold text-gray-800">Modo 2: Envio Automático (API)</h5>
-                            <p class="text-sm text-gray-600">Se você tem credenciais da API do WhatsApp Business, preencha o "Passo 3.5" e clique em "Enviar Mensagens" para disparar automaticamente.</p>
-                        </div>
-                    </div>
                 </div>
                 
-                <div>
-                    <h4 class="font-medium text-gray-900 mb-2">Sobre os Números de Telefone</h4>
-                    <p class="text-sm text-gray-600">O sistema limpa e formata automaticamente os números de telefone para o padrão brasileiro (+55, DDD, e o 9 na frente).</p>
-                    <ul class="list-disc list-inside space-y-1 text-sm text-gray-600">
-                        <li>Números que não tiverem DDD ou tiverem dígitos de menos (menos de 10 dígitos no total) serão marcados como <strong>Inválidos</strong> e não serão processados.</li>
-                    </ul>
-                </div>
-
-                <!--
+                <!-- 
                 ================================================================================
                 | SEÇÃO DE SEGURANÇA (LGPD E ANTI-HACKING) - ATUALIZADA (8 Nov 2025)
                 ================================================================================
@@ -467,45 +476,103 @@
                 |
                 -->
                 <div>
-                    <h4 class="font-medium text-gray-900 mb-2">Nossa Política de Segurança e LGPD</h4>
-                    <p class="text-sm text-gray-600 mb-2">
-                        Este site leva sua privacidade a sério, seguindo a <strong>Lei Geral de Proteção de Dados (LGPD)</strong> (Atualizado em 8 de Novembro de 2025).
+                    <h4 class="font-medium text-gray-900 mb-2">Nossa Política de Segurança e LGPD (Atualizado em 8 de Novembro de 2025)</h4>
+                    <p class="text-sm text-gray-600 mb-3">
+                        Este site leva sua privacidade a sério, seguindo a <strong>Lei Geral de Proteção de Dados (LGPD)</strong>.
+                        Abaixo, detalhamos as medidas de proteção (Técnicas e Administrativas) que implementamos:
                     </p>
-                    <ul class="list-disc list-inside space-y-3 text-sm text-gray-600">
-                        <li>
-                            <strong>Privacidade Total (Seus Dados são Seus):</strong>
-                            (LGPD: Minimização de Dados). Seus contatos e sua lista <strong>NUNCA</strong> saem do seu computador. Todo o processamento (Passos 1-4) acontece 100% no seu navegador. Nós não vemos, não salvamos e não temos acesso a absolutamente nada da sua lista.
-                        </li>
-                        <li>
-                            <strong>Proteção contra Hacking (XSS):</strong>
-                            (Anti-Hacking). O site "limpa" (higieniza) todas as entradas de texto (como nomes da sua planilha ou mensagens da IA). Isso nos protege contra ataques do tipo Cross-Site Scripting (XSS), garantindo que nenhum código malicioso vindo da sua planilha possa ser executado.
-                        </li>
-                        <li>
-                            <strong>Comunicação Segura (SSL/TLS):</strong>
-                            (LGPD: Criptografia). Toda a comunicação entre seu navegador e nosso servidor (para o Ajudante AI) é 100% criptografada (o "cadeado" HTTPS no seu navegador).
-                        </li>
-                        <li>
-                            <strong>Proteção de Senhas (API Token):</strong>
-                            (LGPD: Senhas e Autenticação). Seu "Token de Acesso" (no Modo 2) é tratado como uma senha: ele é mascarado (***) e salvo *apenas temporariamente* no seu navegador (`sessionStorage`). Ele é apagado assim que você fecha a aba.
-                        </li>
-                        <li>
-                            <strong>Proteção contra Engenharia Social:</strong>
-                            Nós *nunca* pediremos seu Token de Acesso ou sua lista de contatos por e-mail, chat ou telefone. O único lugar para inserir o Token é no campo "Passo 3.5" deste site.
-                        </li>
-                         <li>
-                            <strong>Logs e Monitoramento (LGPD):</strong>
-                            Nosso servidor registra (loga) eventos de segurança (como "IP X tentou usar o chat"), mas NUNCA registra o conteúdo das suas conversas ou os dados da sua planilha.
-                        </li>
-                         <li>
-                            <strong>Firewall e Backups (LGPD):</strong>
-                            Nosso servidor é protegido por Firewalls de aplicação (WAF) que bloqueiam tráfego suspeito, e nossos sistemas (como os logs) têm backups regulares para prevenção contra perdas.
-                        </li>
-                    </ul>
+                    
+                    <div class="space-y-3 text-sm">
+                        <!-- Criptografia -->
+                        <div class="flex items-start">
+                            <i class="fas fa-shield-alt text-green-600 w-5 text-center mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-gray-800">Criptografia e Comunicação Segura (SSL/TLS)</strong>
+                                <p class="text-gray-600">Toda a comunicação entre seu navegador e nosso servidor (para o Ajudante AI e API do WhatsApp) é 100% criptografada usando HTTPS (o "cadeado" no seu navegador), garantindo a confidencialidade dos dados em trânsito.</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Minimização e Anonimização -->
+                        <div class="flex items-start">
+                            <i class="fas fa-eye-slash text-gray-600 w-5 text-center mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-gray-800">Privacidade Total, Anonimização e Pseudonimização</strong>
+                                <p class="text-gray-600">Seus contatos <strong>NUNCA</strong> saem do seu computador (Modo 1) ou são armazenados em nosso servidor (Modo 2). No Modo 2, os dados são repassados diretamente à API do WhatsApp e descartados. Para a IA, enviamos apenas uma pequena *amostra* anonimizada dos dados (Minimização de Dados).</p>
+                            </div>
+                        </div>
+
+                        <!-- Proteção Anti-Hacking (XSS) -->
+                        <div class="flex items-start">
+                            <i class="fas fa-code text-red-600 w-5 text-center mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-gray-800">Proteção contra Hacking (XSS, Injection)</strong>
+                                <p class="text-gray-600">O site "limpa" (higieniza) todas as entradas de texto (como nomes da sua planilha ou mensagens da IA) antes de exibi-las. Isso nos protege contra ataques do tipo Cross-Site Scripting (XSS). Nosso servidor (backend) também valida e higieniza todas as entradas para prevenir "Pseudo Hacking" ou ataques de injeção.</p>
+                            </div>
+                        </div>
+
+                        <!-- Senhas e Eng. Social -->
+                        <div class="flex items-start">
+                            <i class="fas fa-key text-yellow-600 w-5 text-center mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-gray-800">Senhas, Autenticação e Proteção contra Engenharia Social</strong>
+                                <p class="text-gray-600">Seu "Token de Acesso" (no Modo 2) é tratado como uma senha: ele é mascarado (***) e salvo *apenas temporariamente* na sessão do seu navegador. Nós *nunca* pediremos seu Token ou sua lista de contatos por e-mail ou chat.</p>
+                            </div>
+                        </div>
+
+                        <!-- Controle de Acesso (IAM) -->
+                        <div class="flex items-start">
+                            <i class="fas fa-user-lock text-gray-600 w-5 text-center mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-gray-800">Controle de Acesso (IAM)</strong>
+                                <p class="text-gray-600">Nosso servidor segue o Princípio do Acesso Mínimo. O acesso ao banco de dados e aos servidores de produção é restrito apenas a administradores autorizados.</p>
+                            </div>
+                        </div>
+
+                        <!-- Firewall (WAF) -->
+                        <div class="flex items-start">
+                            <i class="fas fa-stream text-blue-600 w-5 text-center mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-gray-800">Proteção de Sistemas (Firewall - WAF)</strong>
+                                <p class="text-gray-600">Nosso servidor é protegido por Firewalls de Aplicação Web (WAF) que monitoram e filtram ativamente o tráfego para bloquear atividades maliciosas antes que cheguem ao nosso código.</p>
+                            </div>
+                        </div>
+
+                        <!-- Logs e Resposta a Incidentes -->
+                        <div class="flex items-start">
+                            <i class="fas fa-clipboard-list text-gray-600 w-5 text-center mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-gray-800">Monitoramento, Logs e Resposta a Incidentes</strong>
+                                <p class="text-gray-600">Registramos (logamos) eventos de segurança (como "IP X tentou usar o chat"), mas NUNCA registramos o conteúdo das suas conversas ou os dados da sua planilha. Isso nos permite detectar e responder a incidentes sem comprometer sua privacidade.</p>
+
+                            </div>
+                        </div>
+
+                        <!-- Backups -->
+                        <div class="flex items-start">
+                            <i class="fas fa-save text-gray-600 w-5 text-center mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-gray-800">Backups Regulares e Seguros</strong>
+                                <p class="text-gray-600">Como não armazenamos seus dados, o risco de perda é mínimo. No entanto, fazemos backups regulares dos nossos próprios sistemas (logs de segurança e configuração do servidor) para garantir a continuidade do serviço.</p>
+                            </div>
+                        </div>
+
+                        <!-- Governança (PSI) -->
+                        <div class="flex items-start">
+                            <i class="fas fa-book text-gray-600 w-5 text-center mr-3 mt-1"></i>
+                            <div>
+                                <strong class="text-gray-800">Governança e Política (PSI)</strong>
+                                <p class="text-gray-600">Esta própria seção de ajuda serve como parte da nossa Política de Segurança da Informação (PSI), garantindo transparência total (Princípio da Transparência) sobre como protegemos você e seus dados.</p>
+                            </div>
+                        </div>
+
+                    </div>
                 </div>
                 <!-- FIM DA SEÇÃO ATUALIZADA -->
+
             </div>
         </div>
     </div>
+
 
     <!-- Footer -->
     <footer class="bg-white border-t border-gray-200 mt-12">
