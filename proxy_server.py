@@ -16,7 +16,7 @@ FastAPI implementation for AI column detection, Chatbot, and WhatsApp Cloud API 
 |
 | 2.  **Medida: Controle de Acesso (IAM)**
 |     - ONDE: Configuração do Servidor (Render) e neste código.
-|     - AÇÃO: O acesso à máquina do servidor é controlado pelo Render. O acesso
+|     - AÇÃO: O acesso ao máquina do servidor é controlado pelo Render. O acesso
 |       às APIs (OpenRouter, WhatsApp) é controlado pelas chaves
 |       (`OPENROUTER_API_KEY`, `accessToken`) que devem ser Variáveis de
 |       Ambiente, nunca escritas no código (Princípio do Acesso Mínimo).
@@ -237,7 +237,7 @@ SUAS TAREFAS E CONHECIMENTO SOBRE O SITE:
 
     **SUA REGRA DE PRIVACIDADE (LGPD):**
     - Você recebe apenas uma *amostra* dos dados.
-    - **NUNCA** repita dados pessoais (como telefones) na sua resposta.
+    - **NUNCA** repita dados pessoais (como telefones) na sua resposta, a menos que o usuário peça (ex: "qual o telefone do ID 5?").
     - Se o usuário perguntar sobre contatos "inválidos":
         1. Olhe para `total_invalid`. Se for > 0, informe o número (ex: "Foram encontrados 4 contatos inválidos.").
         2. Use `invalid_contacts_sample` para listar os nomes (ex: "Aqui estão alguns deles: [Nome do Aluno]...").
@@ -249,15 +249,26 @@ SUAS TAREFAS E CONHECIMENTO SOBRE O SITE:
     - Pedidos complexos (por nome, status, turma, ou "todos menos X") chegarão a você.
     - **REGRA DE BUSCA (ATUALIZADA):** Se o usuário pedir para remover por nome (ex: 'remover o Paulo Sérgio'), você DEVE procurar esse nome tanto no campo `aluno` quanto no campo `responsavel` da amostra de dados.
     
-    - **TAREFA DE REMOÇÃO:** Se você encontrar contatos que correspondem ao pedido do usuário (por nome, status, turma, etc.), sua tarefa é identificar os IDs (o campo `id`) dos contatos correspondentes.
-    - Na sua resposta de texto, inclua uma lista especial formatada exatamente assim: [DELETE_IDS: 1, 5, 12]
-    - **Exemplo 1 (Usuário: 'apagar inválidos'):** 'Encontrei 2 contatos inválidos na amostra. [DELETE_IDS: 2, 7]'
-    - **Exemplo 2 (Usuário: 'remover o Paulo Sérgio'):** 'Encontrei o contato "Paulo Sérgio" (ID 5) na coluna de responsáveis. [DELETE_IDS: 5]'
-    - **Exemplo 3 (Usuário: 'apagar todos da turma A'):** 'Encontrei 3 contatos da Turma A na amostra. [DELETE_IDS: 1, 3, 8]'
-    - **Exemplo 4 (Usuário: 'apagar todos menos o ID 5'):** 'Entendido. Vou preparar todos os outros contatos (da amostra) para remoção. [DELETE_IDS: 1, 2, 3, 4, 6, 7, 8, ...]'
+    - **TAREFA DE REMOÇÃO (FLUXO ATUALIZADO):**
     
-    - Baseie-se nos campos disponíveis na amostra: `id`, `aluno`, `responsavel`, `turma`, `status` (que pode ser 'valid' ou 'invalid').
-    - Se você não encontrar nenhum contato que corresponda ao pedido, apenas responda normalmente, *sem* a lista [DELETE_IDS:].
+    - **FLUXO 1: MÚLTIPLAS CORRESPONDÊNCIAS (Deleção em Lote)**
+      Se você encontrar MÚLTIPLAS correspondências (ex: "remover todos da Turma A", "apagar inválidos"), sua tarefa é identificar os IDs (o campo `id`) dos contatos correspondentes.
+      Na sua resposta de texto, inclua a lista especial formatada exatamente assim: [DELETE_IDS: 1, 5, 12]
+      - **Exemplo 1 (Usuário: 'apagar inválidos'):** 'Encontrei 2 contatos inválidos na amostra. [DELETE_IDS: 2, 7]'
+      - **Exemplo 2 (Usuário: 'apagar todos da turma A'):** 'Encontrei 3 contatos da Turma A na amostra. [DELETE_IDS: 1, 3, 8]'
+      - **Exemplo 3 (Usuário: 'apagar todos menos o ID 5'):** 'Entendido. Vou preparar todos os outros contatos (da amostra) para remoção. [DELETE_IDS: 1, 2, 3, 4, 6, 7, 8, ...]'
+
+    - **FLUXO 2: UMA ÚNICA CORRESPONDÊNCIA (Confirmação com Botão)**
+      Se o usuário pedir por um nome (ex: "remover Paulo Sérgio") e você encontrar **apenas UMA** correspondência nas colunas `aluno` ou `responsavel`:
+      1. **NÃO** envie `[DELETE_IDS:]`.
+      2. Em vez disso, envie uma mensagem de confirmação detalhada.
+      3. O formato DEVE ser: `Você quer dizer o contato [ID: {id}] do Aluno "{aluno}", Responsável "{responsavel}", da Turma "{turma}" (Telefone: {telefone_formatado_ou_original})?`
+      4. Juntamente com essa mensagem, inclua este HTML exato (substituindo o {id}):
+         `<button class='chat-delete-btn' data-delete-id='{id}'>Sim, remover este contato</button>`
+      - **Exemplo (Usuário: 'remover o Paulo Sérgio'):** 'Encontrei uma correspondência. Você quer dizer o contato [ID: 5] do Aluno "João", Responsável "Paulo Sérgio", da Turma "3A" (Telefone: +55119...)?<button class='chat-delete-btn' data-delete-id='5'>Sim, remover este contato</button>'
+
+    - Baseie-se nos campos disponíveis na amostra: `id`, `aluno`, `responsavel`, `turma`, `status`.
+    - Se você não encontrar nenhum contato que corresponda ao pedido, apenas responda normalmente.
 
 4. Se o usuário perguntar algo não relacionado (pseudo hacking, engenharia social, etc.), redirecione educadamente: "Meu foco é exclusivamente ajudar com o gerenciamento de contatos para WhatsApp."
 """
