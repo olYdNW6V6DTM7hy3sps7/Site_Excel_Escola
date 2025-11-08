@@ -1,6 +1,42 @@
 """
 WhatsApp Bulk Contact Manager - Backend Proxy Server
 FastAPI implementation for AI column detection, Chatbot, and WhatsApp Cloud API proxy
+
+================================================================================
+| NOTA DE SEGURANÇA E LGPD (8 de Novembro de 2025)                             |
+================================================================================
+|
+| Este backend implementa várias das proteções da LGPD diretamente:
+|
+| 1.  **Proteção de Sistemas (WAF/Firewall):**
+|     - ONDE: Configuração do Servidor (Render, Cloudflare, etc.).
+|     - AÇÃO: Este código DEVE rodar atrás de um Firewall (WAF) para bloquear
+|       tráfego malicioso (SQL Injection, DDOS) antes que chegue à API.
+|
+| 2.  **Criptografia e Comunicação Segura (SSL/TLS):**
+|     - ONDE: Configuração do Servidor (Render ativa HTTPS por padrão).
+|     - AÇÃO: Este servidor só deve aceitar conexões via `https://` para
+|       garantir que o `accessToken` e os dados do usuário estejam criptografados.
+|
+| 3.  **Monitoramento e Auditoria de Logs (LGPD):**
+|     - ONDE: Implementado abaixo usando a biblioteca `logging`.
+|     - AÇÃO: Registramos eventos de segurança importantes (logs) para
+|       permitir auditoria e resposta a incidentes, sem registrar
+|       dados pessoais sensíveis (como números de telefone).
+|
+| 4.  **Controle de Acesso (IAM):**
+|     - ONDE: Configuração do Servidor (Render).
+|     - AÇÃO: A máquina que roda este código deve ter acesso mínimo. O Token
+|       `OPENROUTER_API_KEY` deve ser uma Variável de Ambiente, nunca
+|       escrito diretamente no código.
+|
+| 5.  **Prevenção contra Perda (Backups):**
+|     - ONDE: Configuração do Servidor/Redis.
+|     - AÇÃO: Este app segue a "Minimização de Dados": ele NÃO armazena
+|       listas de contatos. A única coisa que precisa de backup é o Redis
+|       (se usado para rastreamento de jobs).
+|
+================================================================================
 """
 
 from fastapi import FastAPI, HTTPException, Request
@@ -15,6 +51,17 @@ import json
 import asyncio
 import re
 from pydantic import BaseModel
+import logging # NOVO: Importa a biblioteca de logs
+
+# --- IMPLEMENTAÇÃO (LGPD: Monitoramento e Auditoria de Logs) ---
+# Configura o sistema de logging do Python para registrar eventos de segurança.
+# Isso é essencial para a LGPD (Art. 46-48).
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(asctime)s] [%(levelname)s] [SEGURANCA_LOG] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+# -----------------------------------------------------------------
 
 # Configurações de Integração da AI
 AI_MODEL = "tngtech/deepseek-r1t2-chimera:free"
@@ -50,6 +97,9 @@ if Config.REDIS_URL:
         redis_client = redis.from_url(Config.REDIS_URL, decode_responses=True)
     except Exception as e:
         print(f"Redis connection failed: {e}")
+        # --- LGPD (Monitoramento) ---
+        logging.error(f"Falha ao conectar ao Redis: {e}")
+        # ------------------------------
 
 # Request/Response Models
 class ColumnDetectionRequest(BaseModel):
@@ -88,7 +138,15 @@ async def check_rate_limit(client_ip: str) -> bool:
         if current == 1:
             redis_client.expire(key, Config.RATE_LIMIT_WINDOW)
         
-        return current <= Config.RATE_LIMIT_REQUESTS
+        is_limited = current > Config.RATE_LIMIT_REQUESTS
+        
+        if is_limited:
+            # --- LGPD (Monitoramento) ---
+            # Registra um evento de segurança crítico.
+            logging.warning(f"RATE LIMIT EXCEDIDO pelo IP: {client_ip}")
+            # ------------------------------
+        
+        return not is_limited
     except Exception:
         # Em caso de erro do Redis, continua sem limitação (fail-open)
         return True
@@ -143,7 +201,9 @@ SUAS TAREFAS E CONHECIMENTO SOBRE O SITE:
         - O JSON conterá um resumo: `total_contacts`, `total_valid`, `total_invalid`.
         - Ele também conterá `invalid_contacts_sample` (uma lista de exemplos de contatos que falharam) e `valid_contacts_sample` (exemplos de contatos que funcionaram).
 
-    **SUA REGRA MAIS IMPORTANTE:**
+    **SUA REGRA MAIS IMPORTANTE (LGPD: Anonimização e Pseudonimização):**
+    - Você recebe apenas uma *amostra* dos dados (Minimização de Dados).
+    - **NUNCA** repita dados pessoais (como telefones ou nomes) na sua resposta, a menos que o usuário pergunte *especificamente* por eles (ex: "Quais nomes falharam?").
     - Se o usuário perguntar sobre contatos que "falharam", "inválidos", ou "deram erro":
         1. Olhe para `total_invalid`. Se for maior que 0, informe o número (ex: "Foram encontrados 4 contatos inválidos.").
         2. Use a lista `invalid_contacts_sample` para listar os nomes dos contatos que falharam (ex: "Aqui estão alguns deles: [Nome do Aluno], [Nome do Aluno]...").
@@ -157,15 +217,24 @@ SUAS TAREFAS E CONHECIMENTO SOBRE O SITE:
 @app.post("/api/chat")
 async def handle_chat_query(request: ChatRequest, client_request: Request):
     """Endpoint para o Chatbot AI"""
+    client_ip = client_request.client.host # IP para logging
+
     if not Config.OPENROUTER_API_KEY:
+        # --- LGPD (Monitoramento) ---
+        logging.error(f"Tentativa de uso do Chat (IP: {client_ip}) falhou: OPENROUTER_API_KEY não configurada.")
+        # ------------------------------
         raise HTTPException(status_code=503, detail="OPENROUTER_API_KEY não configurada. Por favor, defina a variável de ambiente.")
 
-    client_ip = client_request.client.host
     if not await check_rate_limit(client_ip):
         raise HTTPException(
             status_code=429,
             detail="Limite de taxa excedido. Tente novamente mais tarde."
         )
+    
+    # --- LGPD (Monitoramento) ---
+    # Loga a *tentativa* de chat, sem logar a mensagem (privacidade).
+    logging.info(f"Consulta ao Chatbot recebida do IP: {client_ip}")
+    # ------------------------------
 
     # Constrói o histórico de mensagens para a API OpenRouter
     messages = []
@@ -182,6 +251,10 @@ async def handle_chat_query(request: ChatRequest, client_request: Request):
     # Adiciona o contexto dos dados do Excel se fornecido na última mensagem do histórico
     last_user_prompt = messages[-1]["content"]
     if request.contact_data_sample:
+        # --- LGPD (Anonimização / Minimização de Dados) ---
+        # O frontend envia apenas uma AMOSTRA, não a lista completa.
+        # Isso protege a privacidade do usuário (Princípio da Minimização).
+        # --------------------------------------------------
         data_context = f"\n\n--- DADOS DE CONTEXTO DO EXCEL (JSON stringified) ---\n{request.contact_data_sample}\n--- FIM DOS DADOS DE CONTEXTO ---\n"
         last_user_prompt += data_context
     messages[-1]["content"] = last_user_prompt
@@ -209,6 +282,9 @@ async def handle_chat_query(request: ChatRequest, client_request: Request):
             response = None
             
             for attempt in range(max_retries):
+                # --- LGPD (Criptografia e Comunicação Segura) ---
+                # A chamada é feita para `https://openrouter.ai`, garantindo SSL/TLS.
+                # ------------------------------------------------
                 response = await client.post(
                     "https://openrouter.ai/api/v1/chat/completions",
                     headers=headers,
@@ -227,6 +303,9 @@ async def handle_chat_query(request: ChatRequest, client_request: Request):
             
             if response.status_code != 200:
                 print(f"Erro da API OpenRouter: {response.text}")
+                # --- LGPD (Monitoramento) ---
+                logging.error(f"Erro da API OpenRouter (IP: {client_ip}): {response.status_code} - {response.text}")
+                # ------------------------------
                 raise HTTPException(status_code=500, detail=f"Erro ao comunicar com a AI. Código: {response.status_code}")
 
             result = response.json()
@@ -243,6 +322,9 @@ async def handle_chat_query(request: ChatRequest, client_request: Request):
         raise # Rethrow HTTPException
     except Exception as e:
         print(f"Erro geral no Chatbot: {e}")
+        # --- LGPD (Monitoramento) ---
+        logging.critical(f"Exceção inesperada no Chatbot (IP: {client_ip}): {e}")
+        # ------------------------------
         raise HTTPException(status_code=500, detail=f"Erro interno do servidor: {str(e)}")
 
 # AI Column Detection Endpoint (Modificado para usar DeepSeek R1T2 ou Heuristic)
@@ -258,12 +340,21 @@ async def detect_columns(request: ColumnDetectionRequest, client_request: Reques
             detail="Limite de taxa excedido. Tente novamente mais tarde."
         )
     
+    # --- LGPD (Monitoramento) ---
+    logging.info(f"Detecção de colunas iniciada pelo IP: {client_ip}")
+    # ------------------------------
+    
     # Tenta usar a AI para detecção de colunas se a chave estiver configurada
     if Config.OPENROUTER_API_KEY:
         try:
             # Prepare data for AI analysis
             headers_text = ", ".join(request.headers)
             sample_rows = []
+            
+            # --- LGPD (Minimização de Dados) ---
+            # Enviamos apenas os PRIMEIROS 5 registros como amostra.
+            # Nunca enviamos a lista inteira do usuário para a IA.
+            # -------------------------------------
             for row in request.sample_data[:5]:  # Send first 5 rows
                 row_text = ", ".join([f"'{k}': '{v}'" for k, v in row.items()])
                 sample_rows.append(row_text)
@@ -420,12 +511,25 @@ async def send_whatsapp_batch(request: WhatsAppSendRequest, client_request: Requ
     # Validate credentials
     credentials = request.credentials
     required_creds = ["accessToken", "phoneNumberId"]
+    
+    # --- LGPD (Senhas e Autenticação) ---
+    # Verificamos se o Token (a "senha") foi fornecido.
+    # O token em si é enviado via HTTPS (Criptografia), garantindo a
+    # segurança em trânsito.
+    # ---------------------------------------
     for cred in required_creds:
         if not credentials.get(cred):
+            logging.error(f"Tentativa de envio (IP: {client_ip}) falhou: Credencial faltando: {cred}")
             raise HTTPException(status_code=400, detail=f"Credencial faltando: {cred}")
     
     # Process contacts in background
     job_id = f"whatsapp_job_{datetime.utcnow().timestamp()}"
+    
+    # --- LGPD (Monitoramento) ---
+    # Logamos o *início* do trabalho, quantos contatos, mas NUNCA
+    # a lista de telefones ou a mensagem.
+    logging.info(f"Iniciando Job de Envio (IP: {client_ip}): {job_id} para {len(request.contacts)} contatos.")
+    # ------------------------------
     
     # Start background task
     asyncio.create_task(process_whatsapp_batch(
@@ -442,7 +546,13 @@ async def send_whatsapp_batch(request: WhatsAppSendRequest, client_request: Requ
 async def process_whatsapp_batch(job_id: str, contacts: List[Dict], message: str, credentials: Dict):
     """Process WhatsApp messages in background"""
     
-    # Store job status in Redis
+    # --- LGPD (Prevenção contra Perda / Resposta a Incidentes) ---
+    # O status do job é salvo no Redis (um banco de dados rápido).
+    # Se o servidor cair, o status do job (quantos faltam) pode ser
+    # recuperado se o Redis tiver persistência.
+    # Usamos `setex` (com expiração) para que os dados não fiquem para sempre
+    # (Princípio da Retenção de Dados).
+    # -------------------------------------------------------------
     if redis_client:
         redis_client.setex(f"job:{job_id}", 3600, json.dumps({
             "status": "processing",
@@ -482,6 +592,10 @@ async def process_whatsapp_batch(job_id: str, contacts: List[Dict], message: str
     if redis_client:
         completed = len([r for r in results if r.get("success")])
         failed = len([r for r in results if not r.get("success")])
+        
+        # --- LGPD (Monitoramento) ---
+        logging.info(f"Job de Envio Concluído: {job_id}. Sucesso: {completed}, Falhas: {failed}")
+        # ------------------------------
         
         redis_client.setex(f"job:{job_id}", 3600, json.dumps({
             "status": "completed",
@@ -523,8 +637,6 @@ async def send_whatsapp_batch_api(contacts: List[Dict], message: str, credential
                             "language": {
                                 "code": language_code
                             },
-                            # Aqui o payload do template pode precisar ser mais complexo dependendo do template.
-                            # Para simplificar, estamos assumindo que o template só precisa do campo {name} no body
                             "components": [
                                 {
                                     "type": "body",
@@ -546,7 +658,10 @@ async def send_whatsapp_batch_api(contacts: List[Dict], message: str, credential
                         }
                     }
                 
-                # Send message
+                # --- LGPD (Criptografia e Comunicação Segura) ---
+                # A chamada é feita para `https://graph.facebook.com`, garantindo SSL/TLS.
+                # O `access_token` vai no Header (padrão OAuth).
+                # ------------------------------------------------
                 response = await client.post(
                     f"https://graph.facebook.com/v18.0/{phone_number_id}/messages",
                     headers={
