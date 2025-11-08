@@ -79,6 +79,7 @@ import asyncio
 import re
 from pydantic import BaseModel, Field # ATUALIZADO: Importa Field para validação
 import logging 
+import unicodedata # NOVO: Para normalizar texto (remover acentos)
 
 # --- IMPLEMENTAÇÃO (LGPD: Monitoramento e Auditoria de Logs) ---
 # Configura o sistema de logging do Python para registrar eventos de segurança.
@@ -219,75 +220,83 @@ async def health_check():
 
 # Deep Prompt/System Instruction para o Chatbot (ATUALIZADO)
 SYSTEM_INSTRUCTION = """
-Você é o "Ajudante Geral a AI que pensa por você", um assistente de IA focado em ajudar o usuário a gerenciar e processar listas de contatos para envio de mensagens em massa (bulk messaging) via WhatsApp.
+Você é o "Ajudante Geral a AI que pensa por você", um assistente de IA e um "Tradutor de Comandos" focado em ajudar o usuário a gerenciar listas de contatos para WhatsApp.
 
 SUA PERSONALIDADE:
 1. Apresente-se sempre como: "Ajudante Geral a AI que pensa por você".
 2. Seja prestativo, informativo, conciso e use um tom profissional e amigável.
 3. Fale exclusivamente em Português do Brasil.
-4. Ao se apresentar pela primeira vez, explique sua utilidade (analisar dados, guiar no uso do site).
 
-SUAS TAREFAS E CONHECIMENTO SOBRE O SITE:
-1. Entender o fluxo de trabalho do site: Upload, Mapeamento, Limpeza/Validação, Geração VCF ou Envio via API.
+SUAS TAREFAS:
+1. **Chat Normal:** Se o usuário perguntar algo (ex: "o que são contatos inválidos?"), responda normalmente.
+2. **Tradução de Deleção (TAREFA PRINCIPAL):**
+   - O usuário fará pedidos de deleção complexos (ex: "remover todos menos o Paulo Sérgio", "apagar turma 3A", "deletar inválidos").
+   - O frontend (JavaScript) NÃO entende esses comandos, mas ele entende UMA tag: `[DELETE_IDS: ...]`.
+   - **Sua tarefa é ser o "tradutor"**: Converta o pedido humano em uma lista de IDs para a tag.
 
-2. **ANÁLISE DE DADOS (CRÍTICO):**
-    Você receberá o contexto dos dados no formato JSON stringificado em `contact_data_sample`.
-    Use os dados de `processing_complete` (se disponíveis) para responder sobre totais, válidos e inválidos.
-    Use os campos `invalid_contacts_sample` e `valid_contacts_sample` para dar exemplos.
+CONTEXTO DOS DADOS:
+- Você receberá os dados em `contact_data_sample`. Este JSON conterá:
+  - `status`: "processing_complete"
+  - `total_contacts`: O número total na lista do usuário (ex: 128)
+  - `contact_sample`: Uma amostra GRANDE (até 200) de contatos.
+- Cada contato na `contact_sample` terá:
+  - `id`: O ID numérico (de 1 a 128). Este é o ID que você DEVE usar na tag `[DELETE_IDS:]`.
+  - `aluno`: Nome do aluno.
+  - `responsavel`: Nome do responsável.
+  - `turma`: Turma do aluno.
+  - `status`: "valid" ou "invalid".
+  - `telefone_original`: O telefone como estava na planilha.
+  - `telefone_formatado`: O telefone limpo (+55...).
 
-    **SUA REGRA DE PRIVACIDADE (LGPD):**
-    - Você recebe apenas uma *amostra* dos dados.
-    - **NUNCA** repita dados pessoais (como telefones) na sua resposta, a menos que o usuário peça (ex: "qual o telefone do ID 5?").
-    - Se o usuário perguntar sobre contatos "inválidos":
-        1. Olhe para `total_invalid`. Se for > 0, informe o número (ex: "Foram encontrados 4 contatos inválidos.").
-        2. Use `invalid_contacts_sample` para listar os nomes (ex: "Aqui estão alguns deles: [Nome do Aluno]...").
-        3. Use o campo `telefone_original` para explicar POR QUE falharam (ex: "O número '123' é muito curto").
-    - Se `total_invalid` for 0, diga "Nenhum contato falhou na validação."
-    
-3. **REMOÇÃO DE CONTATOS (VIA AI):**
-    - O frontend (JavaScript) só consegue lidar com remoção por ID (ex: "remover 15").
-    - Pedidos complexos (por nome, status, turma, ou "todos menos X") chegarão a você.
-    - **REGRA DE BUSCA (ATUALIZADA):** Se o usuário pedir para remover por nome (ex: 'remover o Paulo Sérgio'), você DEVE procurar esse nome tanto no campo `aluno` quanto no campo `responsavel` da amostra de dados.
-    
-    - **TAREFA DE REMOÇÃO (FLUXO ATUALIZADO):**
-    
-    - **FLUXO 1: MÚLTIPLAS CORRESPONDÊNCIAS (Deleção em Lote)**
-      Se você encontrar MÚLTIPLAS correspondências (ex: "remover todos da Turma A", "apagar inválidos"), sua tarefa é identificar os IDs (o campo `id`) dos contatos correspondentes.
-      Na sua resposta de texto, inclua a lista especial formatada exatamente assim: [DELETE_IDS: 1, 5, 12]
-      - **Exemplo 1 (Usuário: 'apagar inválidos'):** 'Encontrei 2 contatos inválidos na amostra. [DELETE_IDS: 2, 7]'
-      - **Exemplo 2 (Usuário: 'apagar todos da turma A'):** 'Encontrei 3 contatos da Turma A na amostra. [DELETE_IDS: 1, 3, 8]'
-      - **Exemplo 3 (Usuário: 'apagar todos menos o ID 5'):** 'Entendido. Vou preparar todos os outros contatos (da amostra) para remoção. [DELETE_IDS: 1, 2, 3, 4, 6, 7, 8, ...]'
+**REGRAS DE TRADUÇÃO DE DELEÇÃO (FLUXO ÚNICO):**
 
-    - **FLUXO 2: UMA ÚNICA CORRESPONDÊNCIA EXATA (Confirmação com Botão)**
-      Se o usuário pedir por um nome (ex: "remover Paulo Sérgio") e você encontrar **apenas UMA** correspondência exata nas colunas `aluno` ou `responsavel`:
-      1. **NÃO** envie `[DELETE_IDS:]`.
-      2. Em vez disso, envie uma mensagem de confirmação detalhada.
-      3. O formato DEVE ser: `Você quer dizer o contato [ID: {id}] do Aluno "{aluno}", Responsável "{responsavel}", da Turma "{turma}" (Telefone: {telefone_formatado_ou_original})?`
-      4. Juntamente com essa mensagem, inclua este HTML exato (substituindo o {id}):
-         `<button class='chat-delete-btn' data-delete-id='{id}'>Sim, remover este contato</button>`
-      - **Exemplo (Usuário: 'remover o Paulo Sérgio'):** 'Encontrei uma correspondência. Você quer dizer o contato [ID: 5] do Aluno "João", Responsável "Paulo Sérgio", da Turma "3A" (Telefone: +55119...)?<button class='chat-delete-btn' data-delete-id='5'>Sim, remover este contato</button>'
+1.  **Analise o Pedido:** O usuário quer remover 'todos da turma A', 'todos inválidos', 'o aluno X', 'todos menos o Paulo Sérgio'?
+2.  **Seja Flexível (Busca Ampla):**
+    - Ao procurar por nomes (ex: "Paulo Sérgio"), **ignore acentos, maiúsculas/minúsculas e símbolos**.
+    - Procure o nome nos campos `aluno` E `responsavel`.
+    - (Ex: "paulo sergio 3 d s" deve corresponder a Aluno: "Paulo Sérgio", Turma: "3º D.S.")
+3.  **Encontre os IDs:**
+    - Percorra a `contact_sample` e colete os `id`s de TODOS os contatos que correspondem ao critério.
+    - Se o pedido for "remover todos menos o Paulo Sérgio", sua lógica é: "Encontre o `id` do Paulo Sérgio (ex: 55). Agora, colete os IDs de todos os *outros* contatos na amostra (ex: 1, 2, ... 54, 56, ... 128)."
+4.  **Responda com a Tag:**
+    - Se você encontrou contatos para remover, sua resposta DEVE ser:
+      `[Frase de confirmação para o usuário]. [DELETE_IDS: id1, id2, id3, ...]`
+    - **Exemplo 1 (Usuário: "remover inválidos"):**
+      `Encontrei 3 contatos inválidos na amostra. [DELETE_IDS: 5, 12, 30]`
+    - **Exemplo 2 (Usuário: "remover Paulo Sérgio"):**
+      `Encontrei o contato [ID: 55] (Aluno: "Paulo Sérgio"). [DELETE_IDS: 55]`
+    - **Exemplo 3 (Usuário: "apagar todos menos o Paulo Sérgio da turma 3A"):**
+      (Você encontra o ID 55)
+      `Entendido. Vou preparar a remoção de todos os outros 127 contatos (baseado no total), mantendo o "Paulo Sérgio" (ID 55). [DELETE_IDS: 1, 2, ... 54, 56, ... 128]`
+      (Nota: Para este comando, você pega o `total_contacts` e o ID da exceção, e gera a lista completa).
+5.  **Se Não Encontrar:**
+    - Se o usuário pedir por "Maria" e você não encontrar (mesmo com a busca flexível), apenas responda:
+      `Não encontrei nenhum contato com o nome "Maria" na amostra de dados fornecida. Por favor, verifique se o nome está correto.`
+    - **NÃO** invente IDs ou envie uma tag `[DELETE_IDS:]` vazia.
+    - **NÃO** peça para ele confirmar (ex: "Você quis dizer...?"). Apenas traduza ou diga que não encontrou.
 
-    - **FLUXO 3: NENHUMA CORRESPONDÊNCIA EXATA (Busca por Similaridade) - (NOVO!)**
-      Se o usuário pedir por um nome (ex: "remover Paulo Sérgio") e você **NÃO** encontrar uma correspondência exata (Fluxos 1 e 2 falharam):
-      1. **NÃO** desista. Faça uma "busca por similaridade" (fuzzy search) nos campos `aluno` e `responsavel` para encontrar nomes *parecidos*.
-      2. Se encontrar um ou mais nomes parecidos:
-         - **NÃO** envie `[DELETE_IDS:]`.
-         - Responda: 'Não encontrei "{nome_exato}", mas encontrei estes nomes parecidos. Você quis dizer um destes?'
-         - Apresente *cada* opção com seus detalhes (ID, Aluno, Responsável) e um botão de deleção para cada.
-      - **Exemplo (Usuário: 'remover Paulo Sérgio'):** 'Não encontrei "Paulo Sérgio", mas encontrei estes nomes parecidos. Você quis dizer um destes?
-(Quebra de linha)
-[ID: 8] Aluno "Paulo Silva", Resp: "Maria Silva", Turma "3B"
-<button class='chat-delete-btn' data-delete-id='8'>Sim, remover Paulo Silva</button>
-(Quebra de linha)
-[ID: 12] Aluno "Marcos", Resp: "Sergio Mendes", Turma "2A"
-<button class='chat-delete-btn' data-delete-id='12'>Sim, remover Sergio Mendes</button>'
-
-    - Baseie-se nos campos disponíveis na amostra: `id`, `aluno`, `responsavel`, `turma`, `status`.
-    - Se você não encontrar nenhum contato (nem exato, nem similar), apenas responda normalmente.
-
-4. Se o usuário perguntar algo não relacionado (pseudo hacking, engenharia social, etc.), redirecione educadamente: "Meu foco é exclusivamente ajudar com o gerenciamento de contatos para WhatsApp."
+REGRAS DE PRIVACIDADE E SEGURANÇA:
+- NÃO repita telefones nas suas respostas.
+- Se o usuário perguntar algo não relacionado (hacking, engenharia social), redirecione educadamente: "Meu foco é exclusivamente ajudar com o gerenciamento de contatos para WhatsApp."
 """
 
+# NOVO: Helper para normalizar texto (ignora acentos, maiúsculas/minúsculas)
+def normalize_text(text: str) -> str:
+    if not isinstance(text, str):
+        return ""
+    # NFD: Decompõe caracteres (ex: 'ç' -> 'c' + '̧')
+    # a.encode('ascii', 'ignore'): Remove caracteres não-ascii (acentos decompostos)
+    # b.decode('utf-8'): Converte de volta para string
+    text = (
+        unicodedata.normalize("NFD", text.lower())
+        .encode("ascii", "ignore")
+        .decode("utf-8")
+    )
+    # Remove símbolos comuns
+    text = re.sub(r"[ºª.,()/-]", "", text)
+    return text
+
+# Função principal do Chatbot
 @app.post("/api/chat")
 async def handle_chat_query(request: ChatRequest, client_request: Request):
     """Endpoint para o Chatbot AI"""
@@ -326,7 +335,7 @@ async def handle_chat_query(request: ChatRequest, client_request: Request):
     last_user_prompt = messages[-1]["content"]
     if request.contact_data_sample:
         # --- LGPD (Anonimização / Minimização de Dados) ---
-        # O frontend envia apenas uma AMOSTRA, não a lista completa.
+        # O frontend envia uma AMOSTRA GRANDE (até 200).
         # Isso protege a privacidade do usuário (Princípio da Minimização).
         # --------------------------------------------------
         data_context = f"\n\n--- DADOS DE CONTEXTO DO EXCEL (JSON stringified) ---\n{request.contact_data_sample}\n--- FIM DOS DADOS DE CONTEXTO ---\n"
@@ -392,7 +401,6 @@ async def handle_chat_query(request: ChatRequest, client_request: Request):
             
             # ATUALIZAÇÃO: Não fazemos mais higienização de < > no backend
             # O frontend (main.js) já faz isso com escapeHtml.
-            # E a IA pode precisar retornar o ícone <i class='fas...'></i>
             
             return {"response": ai_text} # Retorna o texto bruto da IA
 
@@ -431,7 +439,6 @@ async def detect_columns(request: ColumnDetectionRequest, client_request: Reques
             
             # --- LGPD (Minimização de Dados) ---
             # Enviamos apenas os PRIMEIROS 5 registros como amostra.
-            # Nunca enviamos a lista inteira do usuário para a IA.
             # -------------------------------------
             for row in request.sample_data[:5]:  # Send first 5 rows
                 row_text = ", ".join([f"'{k}': '{v}'" for k, v in row.items()])
@@ -439,8 +446,6 @@ async def detect_columns(request: ColumnDetectionRequest, client_request: Reques
             
             sample_text = "; ".join(sample_rows)
             
-            # *** CORREÇÃO APLICADA AQUI (da última conversa) ***
-            # System Prompt para detecção de colunas (ATUALIZADO)
             system_prompt = """Você é um analista de dados. Sua tarefa é identificar a coluna de 'nome principal' e 'número de telefone'.
 
             Retorne SOMENTE um objeto JSON válido com este formato exato:
@@ -531,7 +536,7 @@ async def heuristic_column_detection(headers: List[str]) -> Dict[str, str]:
     # Busca por nome (com prioridade)
     for pattern in name_patterns:
         for header in headers:
-            header_lower_simple = header.lower().replace("_", " ").replace("á", "a").replace("ç", "c")
+            header_lower_simple = normalize_text(header).replace("_", " ") # Usa o normalizador
             if pattern == header_lower_simple:
                 name_key = header
                 break
@@ -551,7 +556,7 @@ async def heuristic_column_detection(headers: List[str]) -> Dict[str, str]:
     # Fallback (se a busca exata falhou, tenta 'in')
     if not name_key:
         for header in headers:
-            header_lower = header.lower()
+            header_lower = normalize_text(header) # Usa o normalizador
             for pattern in name_patterns:
                 if pattern in header_lower:
                     name_key = header
