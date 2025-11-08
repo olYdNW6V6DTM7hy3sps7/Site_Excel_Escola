@@ -1,6 +1,10 @@
 // WhatsApp Bulk Contact Manager & Messenger
 // Main JavaScript Module
 
+// ** VARIÁVEL DE AMBIENTE DA API (ATUALIZE ESTE VALOR) **
+// Configure com o URL principal do seu serviço Render (ex: https://seu-servico.onrender.com)
+const API_BASE_URL = 'https://site-excel-escola-v1-1-0.onrender.com';
+
 class WhatsAppBulkManager {
     constructor() {
         this.contacts = [];
@@ -13,6 +17,7 @@ class WhatsAppBulkManager {
         this.initializeElements();
         this.bindEvents();
         this.loadSavedState();
+        this.initializeChat(); // Novo: Inicializa o Chatbot
     }
 
     initializeElements() {
@@ -61,14 +66,14 @@ class WhatsAppBulkManager {
         // Modal elements
         this.progressModal = document.getElementById('progressModal');
         this.helpModal = document.getElementById('helpModal');
-        
-        // NOVO: Chatbot elements
+
+        // Chatbot elements (NOVO)
         this.chatToggleBtn = document.getElementById('chatToggleBtn');
         this.chatContainer = document.getElementById('chatContainer');
         this.chatCloseBtn = document.getElementById('chatCloseBtn');
+        this.chatMessages = document.getElementById('chatMessages');
         this.chatForm = document.getElementById('chatForm');
         this.chatInput = document.getElementById('chatInput');
-        this.chatMessages = document.getElementById('chatMessages');
         this.chatSendBtn = document.getElementById('chatSendBtn');
         this.chatStatus = document.getElementById('chatStatus');
     }
@@ -107,8 +112,8 @@ class WhatsAppBulkManager {
         this.phoneNumberId.addEventListener('input', this.saveApiConfig.bind(this));
         this.templateName.addEventListener('input', this.saveApiConfig.bind(this));
         this.languageCode.addEventListener('change', this.saveApiConfig.bind(this));
-        
-        // NOVO: Chatbot events
+
+        // Chatbot events (NOVO)
         this.chatToggleBtn.addEventListener('click', this.toggleChat.bind(this));
         this.chatCloseBtn.addEventListener('click', this.toggleChat.bind(this));
         this.chatForm.addEventListener('submit', this.handleChatSubmit.bind(this));
@@ -118,60 +123,52 @@ class WhatsAppBulkManager {
     }
 
     // NOVO: Lógica do Chatbot
+    initializeChat() {
+        // Inicializa o histórico do chat com a saudação da AI
+        this.addMessage("Olá! Sou o **Ajudante General a AI que pensa por você**. Estou aqui para te ajudar a entender a estrutura do seu arquivo de contatos e como usar todas as funcionalidades do site para envio em massa. O que você gostaria de saber sobre o seu arquivo ou sobre o site?", 'ai', true);
+    }
+    
     toggleChat() {
         this.chatContainer.classList.toggle('hidden');
         if (!this.chatContainer.classList.contains('hidden')) {
-            this.chatInput.focus();
             this.scrollToBottom();
-            // Inicia a conversa com a AI se não houver histórico
-            if (this.chatHistory.length === 0) {
-                // Mensagem inicial forçada para acionar a apresentação da AI
-                const initialMessage = "Olá! Por favor, apresente-se e explique como você pode me ajudar a gerenciar meus contatos com base nos dados que eu carregar.";
-                this.addMessage(initialMessage, 'user', true); // Adiciona ao histórico, mas não exibe como se o usuário tivesse digitado
-                this.callChatAPI(initialMessage, true);
-            }
+            this.chatInput.focus();
         }
     }
     
     handleChatSubmit(e) {
         e.preventDefault();
-        const message = this.chatInput.value.trim();
-        if (!message) return;
+        const userMessage = this.chatInput.value.trim();
+        if (!userMessage) return;
 
-        this.addMessage(message, 'user');
+        this.addMessage(userMessage, 'user');
         this.chatInput.value = '';
         this.chatSendBtn.disabled = true;
-        
-        this.callChatAPI(message);
+
+        this.callChatAPI(userMessage);
     }
 
     addMessage(text, role, isSilent = false) {
-        // Limita o histórico a 20 mensagens (10 pares) para evitar payload muito grande
-        if (this.chatHistory.length >= 20) {
-            this.chatHistory.shift(); 
-            this.chatHistory.shift();
+        // Limita o histórico a 20 mensagens (10 pares) para evitar sobrecarga no payload
+        if (!isSilent && this.chatHistory.length >= 20) {
+            this.chatHistory.shift(); // Remove o mais antigo
         }
-
+        
+        const messageObject = { role: role, text: text };
         if (!isSilent) {
-            this.chatHistory.push({ role, text });
-        } else if (role === 'user') {
-            this.chatHistory.push({ role, text });
-            return; // Não exibe mensagens silenciosas na UI do chat
+            this.chatHistory.push(messageObject);
         }
 
         const messageDiv = document.createElement('div');
-        messageDiv.className = `message-bubble ${role}-message self-${role === 'user' ? 'end' : 'start'}`;
-        
-        // Usa <pre> para mensagens da AI para preservar newlines e formatação
-        if (role === 'ai') {
-            const pre = document.createElement('pre');
-            pre.textContent = text;
-            pre.className = 'text-sm font-sans whitespace-pre-wrap break-words';
-            messageDiv.appendChild(pre);
-        } else {
-            messageDiv.textContent = text;
-        }
+        messageDiv.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'}`;
 
+        const bubble = document.createElement('div');
+        bubble.className = `message-bubble ${role === 'user' ? 'user-message' : 'ai-message'}`;
+
+        // Usa Markdown para formatar a saída da AI
+        bubble.innerHTML = marked.parse(text);
+
+        messageDiv.appendChild(bubble);
         this.chatMessages.appendChild(messageDiv);
         this.scrollToBottom();
     }
@@ -183,11 +180,11 @@ class WhatsAppBulkManager {
     getContactDataSample() {
         if (this.contacts.length === 0) return null;
         
-        // Envia apenas os primeiros 5 contatos com todos os cabeçalhos originais
+        // Envia apenas as 5 primeiras linhas de dados completos
         const sample = this.contacts.slice(0, 5);
         
-        // Stringify para incluir no payload da API
-        return JSON.stringify(sample);
+        // Retorna como JSON stringificado para o backend
+        return JSON.stringify(sample, null, 2);
     }
     
     async callChatAPI(userMessage, isInitial = false) {
@@ -205,22 +202,22 @@ class WhatsAppBulkManager {
         };
 
         try {
-            const response = await fetch('/api/chat', {
+            // Usa o URL base configurado
+            const response = await fetch(`${API_BASE_URL}/api/chat`, { 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
 
             if (response.status === 429) {
-                this.addMessage("Desculpe, o limite de taxa para a AI foi excedido. Por favor, tente novamente em uma hora.", 'ai');
-                // Remove a última mensagem do histórico para não ser enviada no próximo prompt
-                this.chatHistory.pop();
+                this.addMessage('Desculpe, o limite de taxa para o chatbot foi excedido. Tente novamente em 1 hora.', 'ai');
                 return;
             }
             
             if (!response.ok) {
                  const errorData = await response.json();
-                 this.addMessage(`Desculpe, ocorreu um erro na comunicação com a AI: ${errorData.detail || 'Erro desconhecido.'}`, 'ai');
+                 this.addMessage(`Erro da API Chatbot: ${errorData.detail || 'Erro desconhecido.'}`, 'ai');
+                 // Remove a última mensagem do histórico para que o usuário possa tentar novamente sem poluir
                  this.chatHistory.pop();
                  return;
             }
@@ -232,7 +229,8 @@ class WhatsAppBulkManager {
 
         } catch (error) {
             console.error('Chat API Error:', error);
-            this.addMessage('Desculpe, não foi possível conectar ao assistente de AI.', 'ai');
+            this.addMessage('Desculpe, não foi possível conectar ao assistente de AI. Verifique se o backend do Render está ativo.', 'ai');
+            // Remove a última mensagem do histórico em caso de falha de conexão
             this.chatHistory.pop();
         } finally {
             this.chatStatus.classList.add('hidden');
@@ -283,10 +281,13 @@ class WhatsAppBulkManager {
         this.showFileInfo(file);
         
         try {
+            this.showProgress('Processando Arquivo', 'Lendo dados da planilha. Por favor, aguarde...');
             const contacts = await ExcelParser.parse(file);
             this.contacts = contacts;
+            this.hideProgress();
             this.showMappingSection();
         } catch (error) {
+            this.hideProgress();
             this.showError('Erro ao analisar o arquivo: ' + error.message);
         }
     }
@@ -350,13 +351,14 @@ class WhatsAppBulkManager {
         this.detectColumnsBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Detectando...';
 
         try {
-            // Adapta a chamada para o novo endpoint de detecção, que agora pode usar Gemini
+            // Adapta a chamada para o novo endpoint de detecção
             const payload = {
                 headers: this.columns,
                 sample_data: this.contacts.slice(0, 5) // Envia uma amostra
             };
             
-            const response = await fetch('/api/detect-columns', {
+            // Usa o URL base configurado
+            const response = await fetch(`${API_BASE_URL}/api/detect-columns`, { 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -364,7 +366,8 @@ class WhatsAppBulkManager {
 
             if (!response.ok) {
                  const errorData = await response.json();
-                 throw new Error(errorData.detail || 'Erro na detecção de AI.');
+                 this.showError(`Erro na Detecção AI: ${errorData.detail || 'Erro desconhecido.'}`);
+                 throw new Error('AI detection failed');
             }
             
             const result = await response.json();
@@ -381,7 +384,7 @@ class WhatsAppBulkManager {
 
         } catch (error) {
             console.error('AI detection failed:', error);
-            this.showError('A detecção de AI falhou. Por favor, mapeie as colunas manualmente.');
+            this.showError('A detecção por AI falhou. Mapeie as colunas manualmente.');
         } finally {
             this.detectColumnsBtn.disabled = false;
             this.detectColumnsBtn.innerHTML = '<i class="fas fa-magic mr-2"></i>Detecção de Colunas com AI';
@@ -406,7 +409,8 @@ class WhatsAppBulkManager {
             const name = contact[nameKey] || '';
             const phone = contact[phoneKey] || '';
             
-            const cleanedPhone = NumberCleaner.clean(phone);
+            // País padrão Brasil (55)
+            const cleanedPhone = NumberCleaner.clean(phone, '55'); 
             const status = this.getPhoneStatus(phone, cleanedPhone);
 
             return {
@@ -422,19 +426,13 @@ class WhatsAppBulkManager {
 
     getPhoneStatus(original, cleaned) {
         if (!cleaned) return 'invalid';
-        
-        // Remove todos os não-dígitos da string original para comparação
-        const originalDigits = original.toString().replace(/\D/g, '');
-        // Remove o '+' e compara os dígitos
-        const cleanedDigits = cleaned.replace('+', '');
-        
+        // Remove todos os caracteres não-dígitos para comparação
+        const originalDigits = original.toString().replace(/\D/g, ''); 
+        const cleanedDigits = cleaned.toString().replace(/\D/g, '');
+
         if (originalDigits === cleanedDigits) return 'valid';
-        
-        // Verifica se a limpeza resultou em um número E.164 válido (começa com + e tem 10-15 dígitos)
-        if (cleaned.startsWith('+') && cleanedDigits.length >= 10 && cleanedDigits.length <= 15) {
-             return 'corrected';
-        }
-        
+        // Se a limpeza resulta em um número E.164 válido, mas diferente, foi corrigido
+        if (cleaned.startsWith('+')) return 'corrected'; 
         return 'invalid';
     }
 
@@ -449,10 +447,8 @@ class WhatsAppBulkManager {
         const tbody = this.contactTable;
         tbody.innerHTML = '';
 
-        // ALTERAÇÃO: Aumenta o limite de pré-visualização para 200 contatos
-        const displayLimit = 200;
-        const displayContacts = this.processedContacts.slice(0, displayLimit);
-        const totalContacts = this.processedContacts.length;
+        // Exibe mais contatos (primeiros 200) para remover a limitação anterior
+        const displayContacts = this.processedContacts.slice(0, 200); 
 
         displayContacts.forEach(contact => {
             const row = document.createElement('tr');
@@ -460,25 +456,22 @@ class WhatsAppBulkManager {
 
             const statusIcon = this.getStatusIcon(contact.status);
             const statusClass = `status-${contact.status}`;
-            
-            // O índice é contact.id - 1
-            const index = contact.id - 1;
 
             row.innerHTML = `
                 <td class="px-4 py-2 text-gray-600">${contact.id}</td>
                 <td class="px-4 py-2">
                     <input type="text" value="${this.escapeHtml(contact.name)}" 
                            class="border-0 bg-transparent w-full focus:outline-none focus:bg-white focus:border focus:border-gray-300 rounded px-1"
-                           onchange="app.updateContactName(${index}, this.value)">
+                           onchange="app.updateContactName(${contact.id - 1}, this.value)">
                 </td>
                 <td class="px-4 py-2">
                     <input type="text" value="${this.escapeHtml(contact.cleanedPhone)}" 
                            class="border-0 bg-transparent w-full focus:outline-none focus:bg-white focus:border focus:border-gray-300 rounded px-1"
-                           onchange="app.updateContactPhone(${index}, this.value)">
+                           onchange="app.updateContactPhone(${contact.id - 1}, this.value)">
                 </td>
                 <td class="px-4 py-2 ${statusClass}">${statusIcon}</td>
                 <td class="px-4 py-2">
-                    <button onclick="app.downloadSingleVCF(${index})" 
+                    <button onclick="app.downloadSingleVCF(${contact.id - 1})" 
                             class="text-blue-600 hover:text-blue-800 text-xs">
                         <i class="fas fa-download mr-1"></i>VCF
                     </button>
@@ -487,20 +480,14 @@ class WhatsAppBulkManager {
 
             tbody.appendChild(row);
         });
-        
-        // Atualiza a mensagem de limite de pré-visualização
-        const previewText = document.querySelector('#previewSection p.text-sm');
-        if (previewText) {
-             previewText.textContent = `Mostrando os primeiros ${Math.min(displayLimit, totalContacts)} de ${totalContacts} contatos (Edite a tabela diretamente)`;
-        }
     }
 
     getStatusIcon(status) {
         switch (status) {
-            case 'valid': return '●';
-            case 'corrected': return '●';
-            case 'invalid': return '●';
-            default: return '●';
+            case 'valid': return '🟢 Válido';
+            case 'corrected': return '🟡 Corrigido';
+            case 'invalid': return '🔴 Inválido';
+            default: return '⚪ Desconhecido';
         }
     }
 
@@ -513,10 +500,10 @@ class WhatsAppBulkManager {
 
     updateContactPhone(index, value) {
         if (this.processedContacts[index]) {
-            const cleaned = NumberCleaner.clean(value);
+            const cleaned = NumberCleaner.clean(value, '55');
             this.processedContacts[index].cleanedPhone = cleaned;
             this.processedContacts[index].status = this.getPhoneStatus(value, cleaned);
-            this.renderContactTable();
+            this.renderContactTable(); // Renderiza novamente para atualizar o status/ícone
         }
     }
 
@@ -625,7 +612,7 @@ class WhatsAppBulkManager {
         
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${contact.name.replace(/[^a-zA-Z0-9_]/g, '')}.vcf`;
+        a.download = `${contact.name.replace(/[^a-zA-Z0-9]/g, '_')}.vcf`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -646,8 +633,8 @@ class WhatsAppBulkManager {
         }
 
         const messageTemplate = this.messageTemplate.value;
-        if (!messageTemplate.trim()) {
-            this.showError('Por favor, insira um modelo de mensagem');
+        if (!messageTemplate.trim() && !credentials.templateName) {
+            this.showError('Por favor, insira um modelo de mensagem ou um nome de template aprovado.');
             return;
         }
 
@@ -665,9 +652,10 @@ class WhatsAppBulkManager {
 
             this.hideProgress();
             
-            // Exibe um resumo dos resultados
-            this.showSuccess(`Envio concluído. Sucesso: ${results.success}, Falha: ${results.failed}.`);
-            console.log('Resultados do Lote:', results);
+            const successCount = results.success;
+            const failedCount = results.failed;
+
+            this.showSuccess(`Envio concluído. Sucesso: ${successCount}, Falha: ${failedCount}`);
 
         } catch (error) {
             this.hideProgress();
@@ -679,21 +667,20 @@ class WhatsAppBulkManager {
         return {
             accessToken: this.accessToken.value,
             phoneNumberId: this.phoneNumberId.value,
-            templateName: this.templateName.value || '', // Use string vazia se não for fornecido
+            templateName: this.templateName.value || '',
             languageCode: this.languageCode.value || 'pt_BR'
         };
     }
 
     validateCredentials(credentials) {
         if (!credentials.accessToken) {
-            this.showError('Por favor, insira seu token de acesso do WhatsApp Business API');
+            this.showError('Por favor, insira seu token de acesso da API do WhatsApp Business');
             return false;
         }
         if (!credentials.phoneNumberId) {
             this.showError('Por favor, insira o ID do seu número de telefone');
             return false;
         }
-        // Template Name é opcional, pois o API do proxy tenta enviar mensagem de texto se o template for vazio
         return true;
     }
 
@@ -714,7 +701,7 @@ class WhatsAppBulkManager {
                 this.templateName.value = config.templateName || '';
                 this.languageCode.value = config.languageCode || 'pt_BR';
             } catch (error) {
-                console.error('Erro ao carregar a configuração salva:', error);
+                console.error('Erro ao carregar configuração salva:', error);
             }
         }
 
@@ -739,8 +726,8 @@ class WhatsAppBulkManager {
     showProgress(title, message) {
         document.getElementById('progressTitle').textContent = title;
         document.getElementById('progressText').textContent = message;
-        document.getElementById('progressCount').textContent = '0/0';
-        document.getElementById('progressBar').style.width = '0%';
+        document.getElementById('progressCount').textContent = `0/${this.processedContacts.length}`;
+        document.getElementById('progressBar').style.width = `0%`;
         this.showModal('progressModal');
     }
 
@@ -796,9 +783,12 @@ class ExcelParser {
             reader.onload = (e) => {
                 try {
                     const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
+                    // Força a leitura de datas como texto
+                    const workbook = XLSX.read(data, { type: 'array', cellDates: false }); 
                     const sheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[sheetName];
+                    // Mantém os tipos de dados originais (raw) para evitar corrompimento
+                    const worksheet = workbook.Sheets[sheetName]; 
+                    // Transforma para JSON, usando a primeira linha como cabeçalho
                     const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
                     
                     if (json.length < 2) {
@@ -806,12 +796,12 @@ class ExcelParser {
                         return;
                     }
                     
-                    const headers = json[0];
+                    const headers = json[0].map(h => h ? h.toString().trim() : 'Coluna_Vazia');
                     const contacts = json.slice(1).map(row => {
                         const contact = {};
                         headers.forEach((header, index) => {
-                            // Converte null/undefined para string vazia
-                            contact[header] = (row[index] !== undefined && row[index] !== null) ? row[index] : '';
+                            // Converte todo o conteúdo da célula para string para consistência
+                            contact[header] = row[index] !== undefined && row[index] !== null ? row[index].toString().trim() : '';
                         });
                         return contact;
                     });
@@ -830,59 +820,78 @@ class ExcelParser {
 
 // Number Cleaner Module
 class NumberCleaner {
-    static clean(number, countryCode = '55') {
+    // Tenta limpar e formatar para E.164, assumindo +55 para o Brasil por padrão
+    static clean(number, defaultCountryCode = '55') {
         if (!number) return '';
         
+        // 1. Remove tudo que não for dígito, incluindo espaços e pontuações
         const digits = number.toString().replace(/\D/g, '');
         
-        // Se já tiver um código de país, assume-se que é E.164 (sem o '+')
-        if (digits.length >= 10 && digits.length <= 15 && !digits.startsWith(countryCode)) {
-            // Se o número tiver 10 ou mais dígitos e for internacional, retorna com '+'
-            return `+${digits}`;
-        }
+        // Se o número começar com 0, removê-lo (comum em DDD/DDI)
+        let processedDigits = digits.startsWith('0') ? digits.substring(1) : digits;
         
-        // Lógica de correção para Brasil (Country Code '55')
-        if (countryCode === '55') {
-            // Já com 55: 5511987654321 (13 dígitos) -> +5511987654321
-            if (digits.length === 13 && digits.startsWith('55')) {
-                return `+${digits}`;
-            }
-            // Sem 55, mas 11 dígitos: 11987654321 (11 dígitos) -> +5511987654321
-            if (digits.length === 11) {
-                return `+55${digits}`;
-            }
-            // Sem 55, mas 10 dígitos: 1187654321 (10 dígitos). Assume '9' de celular.
-            if (digits.length === 10) {
-                return `+55${digits.substring(0, 2)}9${digits.substring(2)}`;
-            }
-        }
-        
-        // Fallback: se for um número com comprimento razoável (10-15 dígitos) e não foi corrigido, 
-        // retorna-o com '+' como última tentativa de E.164.
-        if (digits.length >= 10 && digits.length <= 15) {
-            return `+${digits}`;
-        }
+        const countryCode = defaultCountryCode;
 
-        return '';
+        // 2. Verifica se o número JÁ está no formato internacional (começa com DDI)
+        if (processedDigits.length >= 10 && processedDigits.length <= 15 && processedDigits.startsWith(countryCode)) {
+             // Já tem DDI, apenas garante o prefixo '+'
+             return `+${processedDigits}`;
+        }
+        
+        // 3. Formato Brasileiro (10 ou 11 dígitos sem DDI)
+        if (countryCode === '55') {
+            
+            // 11 dígitos: (DDD) 9XXXX-XXXX (comum em SP, RJ)
+            if (processedDigits.length === 11 && (processedDigits.startsWith('11') || processedDigits.startsWith('21'))) {
+                return `+${countryCode}${processedDigits}`;
+            }
+            
+            // 10 dígitos: (DDD) XXXX-XXXX (fixo, ou móvel mais antigo sem o 9)
+            if (processedDigits.length === 10) {
+                 // Adiciona 9 após o DDD se for um número móvel. Essa é uma heurística arriscada,
+                 // mas comum em listas antigas no Brasil. 
+                 // Melhor adicionar DDI + 9, assumindo que é móvel.
+                 const ddd = processedDigits.substring(0, 2);
+                 const numberPart = processedDigits.substring(2);
+                 return `+${countryCode}${ddd}9${numberPart}`;
+            }
+
+            // 11 dígitos: (DDI) DDI+DDD+NUMERO (já formatado com 55)
+            if (processedDigits.length === 13 && processedDigits.startsWith('55')) {
+                return `+${processedDigits}`;
+            }
+
+        } else if (processedDigits.length >= 10 && processedDigits.length <= 15) {
+            // Outros países: Se o comprimento for razoável, adiciona o DDI padrão
+            return `+${countryCode}${processedDigits}`;
+        }
+        
+        return ''; // Número inválido ou não detectável
     }
 }
 
 // VCF Generator Module
 class VCFGenerator {
     static generate(contacts) {
-        // Junta os vCards com uma linha em branco entre eles para conformidade
-        const vcards = contacts.map(contact => this.generateSingle(contact));
-        return vcards.join('\r\n');
+        // Filtra contatos com telefone limpo
+        const vcards = contacts
+            .filter(c => c.cleanedPhone && c.cleanedPhone.startsWith('+'))
+            .map(contact => this.generateSingle(contact));
+            
+        // Adiciona cabeçalho e rodapé VCF. Note que 'BEGIN' e 'END' já estão em generateSingle.
+        // Apenas junta as vcards.
+        return vcards.join('\n');
     }
 
     static generateSingle(contact) {
         const name = contact.name || 'Unknown';
         const phone = contact.cleanedPhone || '';
         
+        // O vCard requer N e FN
         return `BEGIN:VCARD
 VERSION:3.0
 FN:${name}
-N:;${name};;;
+N:${name};;;;
 TEL;TYPE=CELL:${phone}
 END:VCARD`;
     }
@@ -890,27 +899,29 @@ END:VCARD`;
 
 // WhatsApp API Module
 class WhatsAppAPI {
+    // Implementação de alto nível para enviar lotes, usando o backend Render para processamento
     static async sendBatch({ contacts, message, credentials, onProgress }) {
+        // Envia todos os dados para o backend para que ele inicie o trabalho assíncrono
         const payload = {
             contacts: contacts,
             message: message,
-            credentials: credentials,
+            credentials: credentials
         };
 
         try {
             // 1. Inicia o Job de envio
-            const response = await fetch('/api/send-whatsapp-batch', {
+            const response = await fetch(`${API_BASE_URL}/api/send-whatsapp-batch`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
 
             if (response.status === 429) {
-                throw new Error('Limite de taxa de API excedido no servidor.');
+                throw new Error('Limite de taxa excedido. Tente novamente mais tarde.');
             }
             if (!response.ok) {
                  const errorData = await response.json();
-                 throw new Error(errorData.detail || 'Erro ao iniciar o envio em lote.');
+                 throw new Error(`Falha ao iniciar o trabalho de envio: ${errorData.detail || 'Erro desconhecido.'}`);
             }
             
             const jobData = await response.json();
@@ -924,18 +935,24 @@ class WhatsAppAPI {
             let results = [];
 
             while (status === 'processing') {
-                // Espera 3 segundos antes do próximo poll
+                // Espera 3 segundos antes do próximo poll (reduz o load no Redis e no servidor)
                 await new Promise(resolve => setTimeout(resolve, 3000));
                 
-                const statusResponse = await fetch(`/api/job-status/${jobId}`);
+                const statusResponse = await fetch(`${API_BASE_URL}/api/job-status/${jobId}`);
+                
+                // Trata erro 503 (Serviço indisponível, ex: Redis não configurado)
+                if (statusResponse.status === 503) {
+                     throw new Error('Job tracking (rastreamento de trabalho) indisponível. Verifique a configuração do Redis no backend.');
+                }
+
                 if (!statusResponse.ok) {
                      // Tenta mais uma vez antes de falhar
                      await new Promise(resolve => setTimeout(resolve, 1000));
-                     const statusResponseRetry = await fetch(`/api/job-status/${jobId}`);
+                     const statusResponseRetry = await fetch(`${API_BASE_URL}/api/job-status/${jobId}`);
                      if (!statusResponseRetry.ok) {
-                         throw new Error('Falha ao obter o status do trabalho.');
+                         const errorDetail = await statusResponseRetry.json().catch(() => ({ detail: 'Erro de rede desconhecido' }));
+                         throw new Error(`Falha ao obter o status do trabalho: ${errorDetail.detail}`);
                      }
-                     
                      
                      // Atualiza os dados do status se o retry funcionar
                      const statusData = await statusResponseRetry.json();
@@ -974,6 +991,9 @@ class WhatsAppAPI {
         }
     }
 }
+
+// Adiciona a biblioteca marked para renderização de markdown no chat
+document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.0.12/marked.min.js"></script>');
 
 // Initialize Application
 let app;
