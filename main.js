@@ -32,14 +32,10 @@ class WhatsAppBulkManager {
 
         // Column mapping elements
         this.mappingSection = document.getElementById('mappingSection');
-        // REMOVIDO: this.nameColumn (Substituído por alunoColumn)
         this.phoneColumn = document.getElementById('phoneColumn');
-        // REMOVIDO: this.detectColumnsBtn (A detecção é automática)
         this.aiStatus = document.getElementById('aiStatus');
-        
-        // NOVO: Campos para identificação de erros (e nome principal)
         this.responsavelColumn = document.getElementById('responsavelColumn');
-        this.alunoColumn = document.getElementById('alunoColumn'); // Usado como "name" principal
+        this.alunoColumn = document.getElementById('alunoColumn'); 
         this.turmaColumn = document.getElementById('turmaColumn');
 
 
@@ -61,10 +57,15 @@ class WhatsAppBulkManager {
         this.templateName = document.getElementById('templateName');
         this.languageCode = document.getElementById('languageCode');
 
-        // Action elements
-        this.actionSection = document.getElementById('actionSection');
+        // Action elements (ATUALIZADO)
+        this.actionSection = document.getElementById('finalStepSection'); // ID Atualizado
         this.generateVcfBtn = document.getElementById('generateVcfBtn');
         this.sendMessagesBtn = document.getElementById('sendMessagesBtn');
+        
+        // NOVOS: Divs de explicação dos modos
+        this.vcfModeExplanation = document.getElementById('vcfModeExplanation');
+        this.apiModeExplanation = document.getElementById('apiModeExplanation');
+
 
         // Mode toggle
         this.modeToggle = document.getElementById('modeToggle');
@@ -94,7 +95,6 @@ class WhatsAppBulkManager {
         this.removeFile.addEventListener('click', this.clearFile.bind(this));
 
         // Column mapping events
-        // REMOVIDO: this.detectColumnsBtn.addEventListener('click', this.detectColumns.bind(this));
         this.alunoColumn.addEventListener('change', this.updatePreview.bind(this));
         this.phoneColumn.addEventListener('change', this.updatePreview.bind(this));
         this.responsavelColumn.addEventListener('change', this.updatePreview.bind(this));
@@ -458,7 +458,7 @@ class WhatsAppBulkManager {
             console.error('AI detection failed:', error);
             this.showError('A detecção por AI falhou. Mapeie as colunas manualmente.');
             if (autoMode) {
-                 this.aiStatus.querySelector('span').textContent = 'Falha na detecção AI. Por favor, mapeie manualmente.';
+                 this.aiStatus.querySelector('span').textContent = 'Falha na detecção AI. Por favor, mapeie manually.';
             }
         }
     }
@@ -548,7 +548,7 @@ class WhatsAppBulkManager {
 
         displayContacts.forEach(contact => {
             const row = document.createElement('tr');
-            row.className = 'hover:bg-gray-50';
+            row.className = 'table-row';
 
             const statusIcon = this.getStatusIconHtml(contact.status);
             const statusClass = `status-${contact.status}`;
@@ -559,18 +559,18 @@ class WhatsAppBulkManager {
                                  : this.escapeHtml(contact.cleanedPhone);
 
             row.innerHTML = `
-                <td class="px-4 py-2 text-gray-600">${contact.id}</td>
-                <td class="px-4 py-2">${this.escapeHtml(contact.aluno)}</td>
-                <td class="px-4 py-2">${this.escapeHtml(contact.responsavel)}</td>
-                <td class="px-4 py-2 text-gray-600">${this.escapeHtml(contact.turma)}</td>
-                <td class="px-4 py-2 ${contact.status === 'invalid' ? 'text-red-500 font-medium' : ''}">
+                <td class="table-cell">${contact.id}</td>
+                <td class="table-cell">${this.escapeHtml(contact.aluno)}</td>
+                <td class="table-cell">${this.escapeHtml(contact.responsavel)}</td>
+                <td class="table-cell">${this.escapeHtml(contact.turma)}</td>
+                <td class="table-cell ${contact.status === 'invalid' ? 'text-red-500 font-medium' : ''}">
                     ${phoneDisplay}
                 </td>
-                <td class="px-4 py-2 text-gray-600">${contact.ddd || '-'}</td>
-                <td class="px-4 py-2 ${statusClass}">
+                <td class="table-cell">${contact.ddd || '-'}</td>
+                <td class="table-cell ${statusClass}">
                     ${statusIcon}
                 </td>
-                <td class="px-4 py-2">
+                <td class="table-cell">
                     <button onclick="app.downloadSingleVCF(${contact.id - 1})" 
                             class="text-blue-600 hover:text-blue-800 text-xs disabled:opacity-50"
                             ${contact.status === 'invalid' ? 'disabled' : ''}>
@@ -668,22 +668,22 @@ class WhatsAppBulkManager {
         return result;
     }
 
-    // Mode Toggle
+    // Mode Toggle (ATUALIZADO)
     toggleMode() {
         this.mode = this.modeToggle.value;
         
         if (this.mode === 'api') {
             this.apiConfigSection.classList.remove('hidden');
-            this.generateVcfBtn.style.display = 'none';
-            this.sendMessagesBtn.style.display = 'inline-flex';
-        } else {
+            this.vcfModeExplanation.style.display = 'none';
+            this.apiModeExplanation.style.display = 'block';
+        } else { // modo 'vcf'
             this.apiConfigSection.classList.add('hidden');
-            this.generateVcfBtn.style.display = 'inline-flex';
-            this.sendMessagesBtn.style.display = 'none';
+            this.vcfModeExplanation.style.display = 'block';
+            this.apiModeExplanation.style.display = 'none';
         }
     }
 
-    // Action Section
+    // Action Section (ATUALIZADO)
     showActionSection() {
         this.actionSection.classList.remove('hidden');
         this.actionSection.classList.add('fade-in');
