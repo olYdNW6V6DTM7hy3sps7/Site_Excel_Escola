@@ -4,6 +4,7 @@
 // - Remoção de contatos via IA (com confirmação detalhada)
 // - Chatbot com design dinâmico e menor
 // - Proteção XSS em todas as saídas de dados
+// - NOVO: Botão de deleção no chat
 
 // ** VARIÁVEL DE AMBIENTE DA API **
 const API_BASE_URL = 'https://site-excel-escola-v1-1-0.onrender.com';
@@ -17,8 +18,13 @@ class WhatsAppBulkManager {
         this.mode = 'vcf';
         this.chatHistory = []; 
         
-        // NOVO: Regex estrito para deleção via JS (apenas IDs)
+        // Regex estrito para deleção via JS (apenas IDs)
         this.simpleDeleteRegex = /(remover|apagar|deletar|excluir)\s+(?:#|linha|id)?\s*(\d+)$/i;
+        
+        // NOVO: Regex para encontrar o botão de deleção da IA
+        // Isso nos permite separar o HTML seguro (botão) do texto do usuário (que precisa ser higienizado)
+        this.chatButtonRegex = /<button class='chat-delete-btn' data-delete-id='(\d+)'>.*?<\/button>/;
+
 
         this.initializeElements();
         this.bindEvents();
@@ -79,7 +85,7 @@ class WhatsAppBulkManager {
         this.progressModal = document.getElementById('progressModal');
         this.helpModal = document.getElementById('helpModal');
         
-        // NOVO: Modal de Confirmação (para remoção)
+        // Modal de Confirmação (para remoção)
         this.confirmationModal = document.getElementById('confirmationModal');
         this.confirmTitle = document.getElementById('confirmTitle');
         this.confirmText = document.getElementById('confirmText'); // Agora é um DIV
@@ -131,7 +137,7 @@ class WhatsAppBulkManager {
         document.getElementById('closeHelp').addEventListener('click', () => this.hideModal('helpModal'));
         document.getElementById('closeProgress').addEventListener('click', () => this.hideModal('progressModal'));
 
-        // NOVO: Eventos do Modal de Confirmação
+        // Eventos do Modal de Confirmação
         this.confirmCancelBtn.addEventListener('click', () => this.hideModal('confirmationModal'));
         this.confirmActionBtn.addEventListener('click', () => {
             if (this.pendingConfirmAction) {
@@ -251,20 +257,19 @@ class WhatsAppBulkManager {
         return false; 
     }
 
-
+    // ATUALIZAÇÃO: addMessage agora lida com HTML (botões)
     addMessage(text, role, isSilent = false) {
-        // NOVO: Limpa os caracteres "*" e "#" das respostas da AI
         let cleanedText = text;
         if (role === 'ai') {
             cleanedText = text.replace(/[*#]/g, ''); // Remove todos os * e #
         }
 
-        // Limita o histórico a 20 mensagens (10 pares) para evitar sobrecarga no payload
+        // Limita o histórico
         if (!isSilent && this.chatHistory.length >= 20) {
-            this.chatHistory.shift(); // Remove o mais antigo
+            this.chatHistory.shift(); 
         }
         
-        const messageObject = { role: role, text: cleanedText }; // Usa o cleanedText
+        const messageObject = { role: role, text: cleanedText }; 
         if (!isSilent) {
             this.chatHistory.push(messageObject);
         }
@@ -275,16 +280,55 @@ class WhatsAppBulkManager {
         const bubble = document.createElement('div');
         bubble.className = `message-bubble ${role === 'user' ? 'user-message' : 'ai-message'}`;
 
-        // COMENTÁRIO DE SEGURANÇA (Anti-Hacking: XSS)
-        // Usamos `escapeHtml` para higienizar CADA mensagem (do usuário e da IA)
-        // antes de inseri-la no DOM com `innerHTML`. Isso previne XSS.
-        const formattedText = this.escapeHtml(cleanedText).replace(/\n/g, '<br>'); // Usa o cleanedText
-        bubble.innerHTML = formattedText;
+        // --- NOVO: LÓGICA DE SEGURANÇA PARA BOTÕES ---
+        // 1. Procura pelo nosso botão de deleção seguro
+        let buttonHtml = '';
+        const match = cleanedText.match(this.chatButtonRegex);
+        if (match && role === 'ai') { // Só confia em botões vindos da IA
+            buttonHtml = match[0]; // Salva o HTML do botão
+            cleanedText = cleanedText.replace(this.chatButtonRegex, ''); // Remove o botão do texto
+        }
+        
+        // 2. Higieniza o TEXTO RESTANTE (previne XSS)
+        const formattedText = this.escapeHtml(cleanedText).replace(/\n/g, '<br>');
+        
+        // 3. Insere o texto higienizado + o HTML do botão (que é seguro)
+        bubble.innerHTML = formattedText + buttonHtml;
+        
+        // 4. Se o botão foi inserido, anexa o event listener a ele
+        if (buttonHtml) {
+            const deleteBtn = bubble.querySelector('.chat-delete-btn');
+            if (deleteBtn) {
+                this.handleChatDeleteClick(deleteBtn);
+            }
+        }
+        // --- FIM DA LÓGICA DE BOTÕES ---
 
         messageDiv.appendChild(bubble);
         this.chatMessages.appendChild(messageDiv);
         this.scrollToBottom();
     }
+    
+    // NOVO: Anexa o listener ao botão do chat
+    handleChatDeleteClick(button) {
+        button.addEventListener('click', (e) => {
+            const id = e.target.getAttribute('data-delete-id');
+            const originalIndex = parseInt(id, 10) - 1;
+            
+            if (isNaN(originalIndex) || originalIndex < 0) {
+                this.showError("Erro no ID do botão de deleção.");
+                return;
+            }
+            
+            // Desabilita o botão para evitar clique duplo
+            e.target.disabled = true;
+            e.target.textContent = "Confirmando...";
+            
+            // Reutiliza o modal de confirmação final
+            this.confirmRemoveContact(originalIndex);
+        });
+    }
+
     
     scrollToBottom() {
         this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
@@ -385,11 +429,11 @@ class WhatsAppBulkManager {
             const data = await response.json();
             const aiResponseText = data.response;
 
-            // ATUALIZAÇÃO: Verificar se a IA mandou uma ordem de deleção
+            // ATUALIZAÇÃO: Verificar se a IA mandou uma ordem de deleção em LOTE
             const deleteMatch = aiResponseText.match(/\[DELETE_IDS:\s*([\d,\s]+)\]/);
 
             if (deleteMatch && deleteMatch[1]) {
-                // A IA quer apagar contatos!
+                // A IA quer apagar contatos em LOTE!
                 const idString = deleteMatch[1];
                 const idsToRemove = idString.split(',')
                     .map(id => parseInt(id.trim()))
@@ -404,7 +448,7 @@ class WhatsAppBulkManager {
                 // 1. Adiciona a mensagem da IA (ex: "Entendido, preparei 5 contatos...")
                 this.addMessage(messageToUser, 'ai');
 
-                // 2. ATUALIZAÇÃO: Monta a lista de detalhes para confirmação
+                // 2. Monta a lista de detalhes para confirmação
                 let detailsHtml = '<ul class="list-disc list-inside text-left text-xs bg-gray-100 p-3 rounded-md max-h-40 overflow-y-auto mt-3">';
                 let count = 0;
                 
@@ -434,10 +478,10 @@ class WhatsAppBulkManager {
                 // 3. Pede confirmação
                 if (count > 0) {
                     // Monta a mensagem final para o modal
-                    const confirmationMessage = `<p>A IA preparou <strong>${count} contato(s)</strong> para remoção. Por favor, confirme os detalhes abaixo:</p> ${detailsHtml}`;
+                    const confirmationMessage = `<p>A IA preparou <strong>${count} contato(s)</strong> para remoção em lote. Por favor, confirme os detalhes abaixo:</p> ${detailsHtml}`;
                     
                     this.showConfirmationModal(
-                        'Remoção via IA',
+                        'Remoção em Lote via IA',
                         confirmationMessage,
                         () => {
                             this.removeContactsBatch(originalIndexesToRemove);
@@ -445,7 +489,8 @@ class WhatsAppBulkManager {
                     );
                 }
             } else {
-                // Resposta normal da IA (sem deleção)
+                // Resposta normal da IA (sem deleção em lote)
+                // A função addMessage VAI procurar por um botão de deleção individual
                 this.addMessage(aiResponseText, 'ai');
             }
 
