@@ -298,7 +298,12 @@ class WhatsAppBulkManager {
             this.contacts = contacts;
             this.hideProgress();
             
-            // NOVO: Chama a detecção e mapeamento automáticos
+            // *** CORREÇÃO APLICADA AQUI ***
+            // Garante que o mapeamento apareça IMEDIATAMENTE após o parse,
+            // antes mesmo da tentativa de AI.
+            this.showMappingSection();
+
+            // Tenta a detecção e mapeamento automáticos
             await this.detectColumns(true);
 
         } catch (error) {
@@ -407,6 +412,10 @@ class WhatsAppBulkManager {
             if (autoMode) {
                  this.aiStatus.querySelector('span').textContent = 'Falha na detecção AI. Por favor, mapeie manualmente.';
             }
+            // *** CORREÇÃO ***
+            // Não chamamos updatePreview() aqui, pois o usuário
+            // precisará selecionar manualmente as colunas, o que
+            // irá disparar o updatePreview() através do evento 'change'.
         }
     }
     
