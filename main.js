@@ -178,7 +178,13 @@ class WhatsAppBulkManager {
         bubble.className = `message-bubble ${role === 'user' ? 'user-message' : 'ai-message'}`;
 
         // Usa Markdown para formatar a saída da AI. Adiciona HTML de forma segura.
-        bubble.innerHTML = new DOMParser().parseFromString(marked.parse(text), 'text/html').body.innerHTML;
+        // bubble.innerHTML = new DOMParser().parseFromString(marked.parse(text), 'text/html').body.innerHTML;
+        
+        // CORREÇÃO: Remove a dependência do 'marked.js' (que causava o erro)
+        // e usa textContent (via escapeHtml) para segurança.
+        // Substitui quebras de linha por <br> para formatação básica.
+        const formattedText = this.escapeHtml(text).replace(/\n/g, '<br>');
+        bubble.innerHTML = formattedText;
 
         messageDiv.appendChild(bubble);
         this.chatMessages.appendChild(messageDiv);
@@ -1084,7 +1090,8 @@ class WhatsAppAPI {
 }
 
 // Adiciona a biblioteca marked para renderização de markdown no chat
-document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.0.12/marked.min.js"></script>');
+// document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.0.12/marked.min.js"></script>');
+// ^^^ CORREÇÃO: Linha removida para evitar que a página quebre.
 
 // Initialize Application
 let app;
