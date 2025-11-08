@@ -32,14 +32,14 @@ class WhatsAppBulkManager {
 
         // Column mapping elements
         this.mappingSection = document.getElementById('mappingSection');
-        this.nameColumn = document.getElementById('nameColumn');
+        // REMOVIDO: this.nameColumn (Substituído por alunoColumn)
         this.phoneColumn = document.getElementById('phoneColumn');
-        this.detectColumnsBtn = document.getElementById('detectColumnsBtn');
+        // REMOVIDO: this.detectColumnsBtn (A detecção é automática)
         this.aiStatus = document.getElementById('aiStatus');
         
-        // NOVO: Campos para identificação de erros
+        // NOVO: Campos para identificação de erros (e nome principal)
         this.responsavelColumn = document.getElementById('responsavelColumn');
-        this.alunoColumn = document.getElementById('alunoColumn');
+        this.alunoColumn = document.getElementById('alunoColumn'); // Usado como "name" principal
         this.turmaColumn = document.getElementById('turmaColumn');
 
 
@@ -94,12 +94,10 @@ class WhatsAppBulkManager {
         this.removeFile.addEventListener('click', this.clearFile.bind(this));
 
         // Column mapping events
-        this.detectColumnsBtn.addEventListener('click', this.detectColumns.bind(this));
-        this.nameColumn.addEventListener('change', this.updatePreview.bind(this));
-        this.phoneColumn.addEventListener('change', this.updatePreview.bind(this));
-        // NOVO: Adiciona listeners para os novos campos de mapeamento
-        this.responsavelColumn.addEventListener('change', this.updatePreview.bind(this));
+        // REMOVIDO: this.detectColumnsBtn.addEventListener('click', this.detectColumns.bind(this));
         this.alunoColumn.addEventListener('change', this.updatePreview.bind(this));
+        this.phoneColumn.addEventListener('change', this.updatePreview.bind(this));
+        this.responsavelColumn.addEventListener('change', this.updatePreview.bind(this));
         this.turmaColumn.addEventListener('change', this.updatePreview.bind(this));
 
 
@@ -129,8 +127,11 @@ class WhatsAppBulkManager {
         this.chatCloseBtn.addEventListener('click', this.toggleChat.bind(this));
         this.chatForm.addEventListener('submit', this.handleChatSubmit.bind(this));
         this.chatInput.addEventListener('input', () => {
+            // Habilita/Desabilita o botão ao digitar
             this.chatSendBtn.disabled = this.chatInput.value.trim() === '';
         });
+        // Garante que o botão está desabilitado no início
+        this.chatSendBtn.disabled = true;
     }
 
     // NOVO: Lógica do Chatbot
@@ -176,8 +177,7 @@ class WhatsAppBulkManager {
         const bubble = document.createElement('div');
         bubble.className = `message-bubble ${role === 'user' ? 'user-message' : 'ai-message'}`;
 
-        // Usa Markdown para formatar a saída da AI
-        // Previne XSS injetando o HTML de forma segura
+        // Usa Markdown para formatar a saída da AI. Adiciona HTML de forma segura.
         bubble.innerHTML = new DOMParser().parseFromString(marked.parse(text), 'text/html').body.innerHTML;
 
         messageDiv.appendChild(bubble);
@@ -297,7 +297,10 @@ class WhatsAppBulkManager {
             const contacts = await ExcelParser.parse(file);
             this.contacts = contacts;
             this.hideProgress();
-            this.showMappingSection();
+            
+            // NOVO: Chama a detecção e mapeamento automáticos
+            await this.detectColumns(true);
+
         } catch (error) {
             this.hideProgress();
             this.showError('Erro ao analisar o arquivo: ' + error.message);
@@ -345,7 +348,7 @@ class WhatsAppBulkManager {
         this.columns = headers;
 
         // Limpa e popula todos os seletores
-        [this.nameColumn, this.phoneColumn, this.responsavelColumn, this.alunoColumn, this.turmaColumn].forEach(select => {
+        [this.alunoColumn, this.phoneColumn, this.responsavelColumn, this.turmaColumn].forEach(select => {
             select.innerHTML = '<option value="">Selecione a coluna...</option>';
             headers.forEach(header => {
                 select.add(new Option(header, header));
@@ -353,20 +356,20 @@ class WhatsAppBulkManager {
         });
     }
 
-    async detectColumns() {
+    async detectColumns(autoMode = false) {
         if (this.columns.length === 0) return;
 
-        this.detectColumnsBtn.disabled = true;
-        this.detectColumnsBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Detectando...';
-
+        if (autoMode) {
+             this.aiStatus.classList.remove('hidden');
+             this.aiStatus.querySelector('span').textContent = 'AI detectando e mapeando colunas...';
+        }
+        
         try {
-            // Adapta a chamada para o novo endpoint de detecção
             const payload = {
                 headers: this.columns,
                 sample_data: this.contacts.slice(0, 5) // Envia uma amostra
             };
             
-            // Usa o URL base configurado
             const response = await fetch(`${API_BASE_URL}/api/detect-columns`, { 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -375,91 +378,96 @@ class WhatsAppBulkManager {
 
             if (!response.ok) {
                  const errorData = await response.json().catch(() => ({ detail: 'Resposta de erro inesperada do servidor.' }));
-                 this.showError(`Erro na Detecção AI: ${errorData.detail || 'Erro desconhecido.'}`);
-                 throw new Error('AI detection failed');
+                 throw new Error(errorData.detail || 'AI detection failed');
             }
             
             const result = await response.json();
             
-            // Mapeamento de Nome e Telefone
+            // Mapeamento usando as chaves de AI (name_key e number_key são genéricos)
+            // Name Key é mapeado para Coluna do Aluno (Nome Principal)
             if (result.name_key && this.columns.includes(result.name_key)) {
-                this.nameColumn.value = result.name_key;
+                this.alunoColumn.value = result.name_key;
             }
             if (result.number_key && this.columns.includes(result.number_key)) {
                 this.phoneColumn.value = result.number_key;
             }
             
-            // NOVO: Mapeamento de campos adicionais (heurística simples para a AI)
-            if (result.responsavel_key && this.columns.includes(result.responsavel_key)) {
-                this.responsavelColumn.value = result.responsavel_key;
-            }
-            if (result.aluno_key && this.columns.includes(result.aluno_key)) {
-                this.alunoColumn.value = result.aluno_key;
-            }
-            if (result.turma_key && this.columns.includes(result.turma_key)) {
-                this.turmaColumn.value = result.turma_key;
-            }
+            // Tentativa heurística para os outros campos (Responsável e Turma)
+            this.responsavelColumn.value = this.findHeuristicColumn(this.columns, ['responsavel', 'resp', 'nome responsavel', 'nome_responsavel']);
+            this.turmaColumn.value = this.findHeuristicColumn(this.columns, ['turma', 'class', 'sala', 'serie']);
 
-
-            this.aiStatus.classList.remove('hidden');
+            if (autoMode) {
+                 this.aiStatus.querySelector('span').textContent = 'AI detectou e mapeou colunas automaticamente.';
+            }
             this.updatePreview();
 
         } catch (error) {
             console.error('AI detection failed:', error);
             this.showError('A detecção por AI falhou. Mapeie as colunas manualmente.');
-        } finally {
-            this.detectColumnsBtn.disabled = false;
-            this.detectColumnsBtn.innerHTML = '<i class="fas fa-magic mr-2"></i>Detecção de Colunas com AI';
+            if (autoMode) {
+                 this.aiStatus.querySelector('span').textContent = 'Falha na detecção AI. Por favor, mapeie manualmente.';
+            }
         }
+    }
+    
+    // Helper para encontrar colunas por heurística
+    findHeuristicColumn(headers, patterns) {
+        for (const header of headers) {
+            const lowerHeader = header.toLowerCase().replace(/[^a-z0-9]/g, ' ');
+            if (patterns.some(p => lowerHeader.includes(p))) {
+                return header;
+            }
+        }
+        return '';
     }
 
     // Contact Preview
     updatePreview() {
-        const nameKey = this.nameColumn.value;
+        const alunoKey = this.alunoColumn.value; // Novo nameKey
         const phoneKey = this.phoneColumn.value;
 
-        if (!nameKey || !phoneKey) return;
+        if (!alunoKey || !phoneKey) return;
         
-        // NOVO: Coleta as chaves dos campos adicionais
+        // Coleta as chaves dos campos adicionais
         const responsavelKey = this.responsavelColumn.value;
-        const alunoKey = this.alunoColumn.value;
         const turmaKey = this.turmaColumn.value;
 
-        this.processContacts(nameKey, phoneKey, responsavelKey, alunoKey, turmaKey);
+        this.processContacts(alunoKey, phoneKey, responsavelKey, turmaKey);
         this.showPreview();
         this.showMessageSection();
         this.showActionSection();
     }
 
-    processContacts(nameKey, phoneKey, responsavelKey, alunoKey, turmaKey) {
+    processContacts(alunoKey, phoneKey, responsavelKey, turmaKey) {
         const processedList = [];
         const invalidList = [];
 
         this.contacts.forEach((contact, index) => {
-            const name = contact[nameKey] || '';
+            const aluno = contact[alunoKey] || 'Não Informado';
             const phone = contact[phoneKey] || '';
             
-            // NOVO: Limpa o número e captura DDD e status
+            // Limpa o número e captura DDD e status
             const cleaningResult = NumberCleaner.clean(phone); 
             const cleanedPhone = cleaningResult.cleanedPhone;
             const status = cleaningResult.status;
 
             const contactData = {
                 id: index + 1,
-                name: name.toString().trim(),
+                name: aluno.toString().trim(), // O nome principal para o template
                 originalPhone: phone.toString().trim(),
                 cleanedPhone: cleanedPhone,
-                ddd: cleaningResult.ddd, // NOVO: Campo DDD
+                ddd: cleaningResult.ddd, 
                 status: status,
                 
-                // NOVO: Dados adicionais para relatório de erro
-                responsavel: contact[responsavelKey] || '',
-                aluno: contact[alunoKey] || '',
-                turma: contact[turmaKey] || '',
+                // Dados adicionais para relatório de erro / tabela
+                responsavel: contact[responsavelKey] || 'Não Informado',
+                aluno: aluno,
+                turma: contact[turmaKey] || 'Não Informado',
                 
                 originalData: contact
             };
             
+            // Regra de invalidação
             if (status === 'invalid') {
                 invalidList.push(contactData);
             } else {
@@ -467,7 +475,7 @@ class WhatsAppBulkManager {
             }
         });
         
-        // NOVO: Junta as listas, colocando inválidos no final
+        // Junta as listas, colocando inválidos no final
         this.processedContacts = processedList.concat(invalidList);
     }
 
@@ -492,15 +500,18 @@ class WhatsAppBulkManager {
             const statusIcon = this.getStatusIconHtml(contact.status);
             const statusClass = `status-${contact.status}`;
 
+            // Determina o telefone a ser exibido na prévia (original se inválido, formatado se válido)
+            const phoneDisplay = contact.status === 'invalid' 
+                                 ? this.escapeHtml(contact.originalPhone || 'Não Informado') 
+                                 : this.escapeHtml(contact.cleanedPhone);
+
             row.innerHTML = `
                 <td class="px-4 py-2 text-gray-600">${contact.id}</td>
-                <td class="px-4 py-2">
-                    <input type="text" value="${this.escapeHtml(contact.name)}" 
-                           class="border-0 bg-transparent w-full focus:outline-none focus:bg-white focus:border focus:border-gray-300 rounded px-1"
-                           onchange="app.updateContactName(${contact.id - 1}, this.value)">
-                </td>
+                <td class="px-4 py-2">${this.escapeHtml(contact.aluno)}</td>
+                <td class="px-4 py-2">${this.escapeHtml(contact.responsavel)}</td>
+                <td class="px-4 py-2 text-gray-600">${this.escapeHtml(contact.turma)}</td>
                 <td class="px-4 py-2 ${contact.status === 'invalid' ? 'text-red-500 font-medium' : ''}">
-                    ${this.escapeHtml(contact.cleanedPhone || contact.originalPhone)}
+                    ${phoneDisplay}
                 </td>
                 <td class="px-4 py-2 text-gray-600">${contact.ddd || '-'}</td>
                 <td class="px-4 py-2 ${statusClass}">
@@ -519,25 +530,26 @@ class WhatsAppBulkManager {
         });
     }
     
-    // NOVO: Retorna o HTML do ícone de status
+    // Retorna o HTML do ícone de status (Simplificado: Apenas Válido/Inválido)
     getStatusIconHtml(status) {
         switch (status) {
             case 'valid': return '<i class="fas fa-check-circle"></i> Válido';
-            case 'corrected': return '<i class="fas fa-exclamation-triangle"></i> Corrigido';
             case 'invalid': return '<i class="fas fa-times-circle"></i> Inválido';
-            default: return 'Desconhecido';
+            default: return 'Inválido'; // Deve ser sempre valid ou invalid após a limpeza
         }
     }
 
 
     updateContactName(index, value) {
         if (this.processedContacts[index]) {
+            // Atualiza o nome do aluno (name)
             this.processedContacts[index].name = value;
+            this.processedContacts[index].aluno = value;
             this.updateMessagePreview();
         }
     }
     
-    // NOVO: Atualiza o número de telefone e reprocessa a lista para manter inválidos no final
+    // Atualiza o número de telefone e reprocessa a lista para manter inválidos no final
     updateContactPhone(index, value) {
         if (this.processedContacts[index]) {
             const contact = this.processedContacts[index];
@@ -556,8 +568,6 @@ class WhatsAppBulkManager {
             this.renderContactTable();
         }
     }
-    
-    // O resto da classe (Message Composer, Mode Toggle, VCF, API, etc.) permanece inalterado.
     
     // Message Composer
     showMessageSection() {
@@ -588,13 +598,19 @@ class WhatsAppBulkManager {
 
     replacePlaceholders(template, contact) {
         let result = template;
-        result = result.replace(/{name}/g, contact.name || '');
+        // Substitui {name} pelo nome do aluno
+        result = result.replace(/{name}/g, contact.name || 'Nome_do_Aluno');
         
-        // Replace other custom fields
+        // Substitui outros campos personalizados
         Object.keys(contact.originalData).forEach(key => {
             const placeholder = `{${key}}`;
             result = result.replace(new RegExp(placeholder, 'g'), contact.originalData[key] || '');
         });
+
+        // Adiciona placeholders explícitos para os campos mapeados (caso o usuário use-os)
+        result = result.replace(/{aluno}/g, contact.aluno || '');
+        result = result.replace(/{responsavel}/g, contact.responsavel || '');
+        result = result.replace(/{turma}/g, contact.turma || '');
 
         return result;
     }
@@ -870,7 +886,7 @@ class ExcelParser {
     }
 }
 
-// Number Cleaner Module (Totalmente Reescrito conforme as regras brasileiras detalhadas)
+// Number Cleaner Module (Lógica de validação simplificada)
 class NumberCleaner {
     
     // NOVO: Retorna um objeto com o número limpo, DDD e o status
@@ -882,17 +898,17 @@ class NumberCleaner {
         // 1. Primeira limpeza: Remove tudo que não for dígito
         let digits = number.toString().replace(/\D/g, '');
         
-        // 2. Retirar os 2 primeiros caracteres se forem '55' (DDI Brasil)
+        // 2. Retirar os 2 primeiros caracteres se eles forem == 55 (DDI Brasil)
         if (digits.startsWith('55')) {
             digits = digits.substring(2);
         }
         
-        // Se o número começar com '0', remover
+        // Se o número começar com '0', remover (comum em discagens de longa distância)
         if (digits.startsWith('0')) {
             digits = digits.substring(1);
         }
 
-        // Se o número for muito curto para ser um DDD + número, é inválido
+        // Se o número for muito curto para ter DDD + 8 dígitos, é inválido
         if (digits.length < 10) { 
             return { cleanedPhone: number.toString(), ddd: '', status: 'invalid' };
         }
@@ -900,26 +916,30 @@ class NumberCleaner {
         // 3. Conferir e salvar o DDD (2 primeiros dígitos)
         const ddd = digits.substring(0, 2);
         let numberPart = digits.substring(2);
-
-        // 4. Retirar o '9' (se for o próximo dígito e o número tiver 9 dígitos)
-        // Isso cobre o caso de número móvel que tem 9 dígitos (9xxxx-xxxx).
+        
+        // 4. Tratamento do dígito 9:
         if (numberPart.length === 9 && numberPart.startsWith('9')) {
-            // Remove o primeiro '9' para normalizar, deixando 8 dígitos
-            numberPart = numberPart.substring(1);
-        }
-
-        // 5. Conferir se tem 8 dígitos totais ou menos
-        if (numberPart.length < 8 || numberPart.length > 8) { 
-            // Inválido: Não sobrou 8 dígitos após a limpeza e tratamento do DDD/9
+            // Número móvel completo (9 + 8 dígitos). Normaliza para 8 dígitos para reconstrução
+            numberPart = numberPart.substring(1); 
+        } else if (numberPart.length === 8) {
+            // Número fixo ou móvel legado (8 dígitos). Injetamos o 9, o que é apenas formatação para E.164
+            // Nota: Não marcamos como 'corrected' porque a regra é: 8 dígitos válidos = 'valid'.
+        } else {
+            // Número tem 7, 10, ou mais de 11 dígitos, o que é inválido no padrão móvel
             return { cleanedPhone: number.toString(), ddd: ddd, status: 'invalid' };
         }
         
-        // Se chegou até aqui, o número é válido e foi normalizado para 8 dígitos
-        // Formato final: +55 + DDD + 9 + Número de 8 dígitos
+        // 5. Conferir se sobrou exatamente 8 dígitos (Validação final)
+        if (numberPart.length !== 8) { 
+            // Inválido: Se a lógica anterior foi ignorada, o número não é válido
+            return { cleanedPhone: number.toString(), ddd: ddd, status: 'invalid' };
+        }
+        
+        // Construção do número E.164 (sempre +55 + DDD + 9 + 8 dígitos)
         const finalNumber = `+55${ddd}9${numberPart}`;
         
-        // Verifica se houve correção/formatação (se o número original não tinha +55)
-        const status = (number.toString().replace(/\D/g, '') === finalNumber.replace(/\D/g, '')) ? 'valid' : 'corrected';
+        // Determinação do Status: Se sobrou 8 dígitos após toda a limpeza e normalização, é válido.
+        const status = 'valid';
         
         return { cleanedPhone: finalNumber, ddd: ddd, status: status };
     }
