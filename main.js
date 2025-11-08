@@ -1,9 +1,9 @@
 // WhatsApp Bulk Contact Manager & Messenger
 // Main JavaScript Module
 // ATUALIZADO: 8 de Novembro de 2025
-// - Adicionada funcionalidade de remoção de contatos (Manual e via AI)
-// - Adicionado modal de confirmação para ações destrutivas (sem usar alert/confirm)
-// - Adicionada higienização de HTML em todas as saídas de dados do usuário (Proteção XSS)
+// - Remoção de contatos via IA (com confirmação detalhada)
+// - Chatbot com design dinâmico e menor
+// - Proteção XSS em todas as saídas de dados
 
 // ** VARIÁVEL DE AMBIENTE DA API **
 const API_BASE_URL = 'https://site-excel-escola-v1-1-0.onrender.com';
@@ -17,6 +17,9 @@ class WhatsAppBulkManager {
         this.mode = 'vcf';
         this.chatHistory = []; 
         
+        // NOVO: Regex estrito para deleção via JS (apenas IDs)
+        this.simpleDeleteRegex = /(remover|apagar|deletar|excluir)\s+(?:#|linha|id)?\s*(\d+)$/i;
+
         this.initializeElements();
         this.bindEvents();
         this.loadSavedState();
@@ -24,7 +27,7 @@ class WhatsAppBulkManager {
     }
 
     initializeElements() {
-        // ... (elementos existentes) ...
+        // File upload elements
         this.dropZone = document.getElementById('dropZone');
         this.fileInput = document.getElementById('fileInput');
         this.fileInfo = document.getElementById('fileInfo');
@@ -33,6 +36,7 @@ class WhatsAppBulkManager {
         this.removeFile = document.getElementById('removeFile');
         this.browseBtn = document.getElementById('browseBtn');
 
+        // Column mapping elements
         this.mappingSection = document.getElementById('mappingSection');
         this.phoneColumn = document.getElementById('phoneColumn');
         this.aiStatus = document.getElementById('aiStatus');
@@ -40,21 +44,26 @@ class WhatsAppBulkManager {
         this.alunoColumn = document.getElementById('alunoColumn'); 
         this.turmaColumn = document.getElementById('turmaColumn');
 
+
+        // Preview elements
         this.previewSection = document.getElementById('previewSection');
         this.totalContacts = document.getElementById('totalContacts');
         this.contactTable = document.getElementById('contactTable');
 
+        // Message composer elements
         this.messageSection = document.getElementById('messageSection');
         this.messageTemplate = document.getElementById('messageTemplate');
         this.messagePreview = document.getElementById('messagePreview');
         this.charCount = document.getElementById('charCount');
 
+        // API config elements
         this.apiConfigSection = document.getElementById('apiConfigSection');
         this.accessToken = document.getElementById('accessToken');
         this.phoneNumberId = document.getElementById('phoneNumberId');
         this.templateName = document.getElementById('templateName');
         this.languageCode = document.getElementById('languageCode');
 
+        // Action elements
         this.actionSection = document.getElementById('finalStepSection'); 
         this.generateVcfBtn = document.getElementById('generateVcfBtn');
         this.sendMessagesBtn = document.getElementById('sendMessagesBtn');
@@ -62,6 +71,8 @@ class WhatsAppBulkManager {
         this.vcfModeExplanation = document.getElementById('vcfModeExplanation');
         this.apiModeExplanation = document.getElementById('apiModeExplanation');
 
+
+        // Mode toggle
         this.modeToggle = document.getElementById('modeToggle');
 
         // Modais
@@ -71,11 +82,11 @@ class WhatsAppBulkManager {
         // NOVO: Modal de Confirmação (para remoção)
         this.confirmationModal = document.getElementById('confirmationModal');
         this.confirmTitle = document.getElementById('confirmTitle');
-        this.confirmText = document.getElementById('confirmText');
+        this.confirmText = document.getElementById('confirmText'); // Agora é um DIV
         this.confirmActionBtn = document.getElementById('confirmActionBtn');
         this.confirmCancelBtn = document.getElementById('confirmCancelBtn');
 
-        // Chatbot
+        // Chatbot elements
         this.chatToggleBtn = document.getElementById('chatToggleBtn');
         this.chatContainer = document.getElementById('chatContainer');
         this.chatCloseBtn = document.getElementById('chatCloseBtn');
@@ -90,7 +101,7 @@ class WhatsAppBulkManager {
     }
 
     bindEvents() {
-        // ... (eventos de upload, mapping, etc.) ...
+        // File upload events
         this.dropZone.addEventListener('dragover', this.handleDragOver.bind(this));
         this.dropZone.addEventListener('dragleave', this.handleDragLeave.bind(this));
         this.dropZone.addEventListener('drop', this.handleDrop.bind(this));
@@ -98,17 +109,24 @@ class WhatsAppBulkManager {
         this.fileInput.addEventListener('change', this.handleFileSelect.bind(this));
         this.removeFile.addEventListener('click', this.clearFile.bind(this));
 
+        // Column mapping events
         this.alunoColumn.addEventListener('change', this.updatePreview.bind(this));
         this.phoneColumn.addEventListener('change', this.updatePreview.bind(this));
         this.responsavelColumn.addEventListener('change', this.updatePreview.bind(this));
         this.turmaColumn.addEventListener('change', this.updatePreview.bind(this));
 
+
+        // Message composer events
         this.messageTemplate.addEventListener('input', this.updateMessagePreview.bind(this));
+
+        // Mode toggle
         this.modeToggle.addEventListener('change', this.toggleMode.bind(this));
+
+        // Action buttons
         this.generateVcfBtn.addEventListener('click', this.generateVCF.bind(this));
         this.sendMessagesBtn.addEventListener('click', this.sendMessages.bind(this));
 
-        // Eventos de Modais
+        // Modal events
         document.getElementById('helpBtn').addEventListener('click', () => this.showModal('helpModal'));
         document.getElementById('closeHelp').addEventListener('click', () => this.hideModal('helpModal'));
         document.getElementById('closeProgress').addEventListener('click', () => this.hideModal('progressModal'));
@@ -124,19 +142,21 @@ class WhatsAppBulkManager {
         });
 
 
-        // ... (eventos de config de API) ...
+        // API config events
         this.accessToken.addEventListener('input', this.saveApiConfig.bind(this));
         this.phoneNumberId.addEventListener('input', this.saveApiConfig.bind(this));
         this.templateName.addEventListener('input', this.saveApiConfig.bind(this));
         this.languageCode.addEventListener('change', this.saveApiConfig.bind(this));
 
-        // Eventos do Chatbot
+        // Chatbot events
         this.chatToggleBtn.addEventListener('click', this.toggleChat.bind(this));
         this.chatCloseBtn.addEventListener('click', this.toggleChat.bind(this));
         this.chatForm.addEventListener('submit', this.handleChatSubmit.bind(this));
         this.chatInput.addEventListener('input', () => {
+            // Habilita/Desabilita o botão ao digitar
             this.chatSendBtn.disabled = this.chatInput.value.trim() === '';
         });
+        // Garante que o botão está desabilitado no início
         this.chatSendBtn.disabled = true;
     }
 
@@ -147,8 +167,15 @@ class WhatsAppBulkManager {
     }
     
     toggleChat() {
-        this.chatContainer.classList.toggle('hidden');
-        if (!this.chatContainer.classList.contains('hidden')) {
+        // ATUALIZAÇÃO: Usa classes de transição (opacity, scale, transform)
+        // em vez de 'hidden' para um efeito "dinâmico".
+        this.chatContainer.classList.toggle('opacity-0');
+        this.chatContainer.classList.toggle('scale-95');
+        this.chatContainer.classList.toggle('-translate-y-4');
+        this.chatContainer.classList.toggle('pointer-events-none');
+        
+        if (!this.chatContainer.classList.contains('opacity-0')) {
+            // Se o chat está abrindo (não contém mais opacity-0)
             this.scrollToBottom();
             this.chatInput.focus();
         }
@@ -163,67 +190,81 @@ class WhatsAppBulkManager {
         this.chatInput.value = '';
         this.chatSendBtn.disabled = true;
 
-        // NOVO: Verificar intenção de remoção ANTES de chamar a API
-        const deletionHandled = await this.checkDeletionIntent(userMessage);
+        // ATUALIZAÇÃO: A verificação agora é síncrona e mais rápida
+        const deletionHandled = this.checkDeletionIntent(userMessage);
         
         if (!deletionHandled) {
-            // Se não for uma remoção, chama a IA
+            // Se não for uma remoção SIMPLES (por ID), chama a IA
             this.callChatAPI(userMessage);
         }
     }
 
-    // NOVO: Função para verificar intenção de remoção
-    async checkDeletionIntent(message) {
-        // Regex para capturar intenção (remover, apagar, etc.) + nome/ID
-        const regex = /(remover|apagar|deletar|excluir)\s+(?:o\s+contato|contato|o\s+aluno|aluno)?\s*([A-Za-zÀ-ú\s\d'"#]+)/i;
-        const match = message.match(regex);
+    // ATUALIZAÇÃO: Função agora é síncrona e só lida com IDs
+    checkDeletionIntent(message) {
+        // Regex agora está no construtor (this.simpleDeleteRegex)
+        // Só captura comandos como "remover 15" ou "apagar #15"
+        const match = message.match(this.simpleDeleteRegex);
 
         if (match) {
-            const targetName = match[2].trim().replace(/['"]+/g, ''); // Limpa o nome/ID
+            const targetIdStr = match[2]; // O ID capturado
+            const targetId = parseInt(targetIdStr, 10);
             
-            // Tenta encontrar o contato na lista processada
-            // Busca pelo nome do aluno ou pelo ID (número da linha)
-            const targetIndex = this.processedContacts.findIndex(contact => 
-                (contact.aluno && contact.aluno.toLowerCase() === targetName.toLowerCase()) ||
-                (contact.id.toString() === targetName)
-            );
+            if (isNaN(targetId) || targetId <= 0) {
+                 // Caso estranho onde o regex captura algo não-numérico (improvável)
+                 this.addMessage(`O ID "${this.escapeHtml(targetIdStr)}" não parece ser um número de linha válido.`, 'ai');
+                 return true; // Intenção tratada (com falha)
+            }
+            
+            // O ID (base 1) precisa ser convertido para índice (base 0)
+            const originalIndex = targetId - 1; 
+            
+            // Verifica se o contato existe na lista original
+            const contact = this.contacts[originalIndex];
 
-            if (targetIndex !== -1) {
-                // Encontrou. Pega o ID original (que é o índice em `this.contacts`)
-                const contactToRemove = this.processedContacts[targetIndex];
-                const originalIndex = contactToRemove.id - 1; 
+            if (contact) {
+                // Encontrou. Pega o nome do aluno da coluna mapeada
+                const alunoKey = this.alunoColumn.value;
+                const contactName = (alunoKey ? contact[alunoKey] : `Linha ${targetId}`) || `Linha ${targetId}`;
+
+                // ATUALIZAÇÃO: A mensagem de confirmação agora vai para o innerHTML
+                const confirmationMessage = `<p>Você pediu para remover o ID #${targetId}: <strong>${this.escapeHtml(contactName)}</strong>. Confirma?</p>`;
 
                 // Mostra o modal de confirmação
                 this.showConfirmationModal(
-                    'Remover via IA',
-                    `A IA entendeu que você quer remover o contato: <strong>${this.escapeHtml(contactToRemove.aluno)}</strong> (Linha ${contactToRemove.id}). Confirma?`,
+                    'Remover Contato',
+                    confirmationMessage,
                     () => {
-                        this.removeContact(originalIndex);
-                        this.addMessage(`Entendido. O contato "${this.escapeHtml(contactToRemove.aluno)}" foi removido da lista.`, 'ai');
+                        // ATUALIZAÇÃO: Chama a nova função de remoção em lote
+                        this.removeContactsBatch([originalIndex]);
+                        this.addMessage(`Entendido. O contato "${this.escapeHtml(contactName)}" (ID ${targetId}) foi removido.`, 'ai');
                     }
                 );
                 return true; // Intenção tratada
             } else {
-                // Não encontrou
-                this.addMessage(`Não consegui encontrar um contato com o nome ou ID "${this.escapeHtml(targetName)}" na lista. Você pode tentar o nome exato ou o número da linha (Coluna #)?`, 'ai');
+                // Não encontrou o ID
+                this.addMessage(`Não consegui encontrar um contato com o ID #${targetId}. Verifique o número da linha na tabela.`, 'ai');
                 return true; // Intenção tratada (com falha)
             }
         }
-        return false; // Nenhuma intenção de remoção
+        // Se não deu match, é um comando complexo (ex: "remover Paulo")
+        // ou um chat normal. Deixa a IA decidir.
+        return false; 
     }
 
 
     addMessage(text, role, isSilent = false) {
+        // NOVO: Limpa os caracteres "*" e "#" das respostas da AI
         let cleanedText = text;
         if (role === 'ai') {
-            cleanedText = text.replace(/[*#]/g, ''); 
+            cleanedText = text.replace(/[*#]/g, ''); // Remove todos os * e #
         }
 
+        // Limita o histórico a 20 mensagens (10 pares) para evitar sobrecarga no payload
         if (!isSilent && this.chatHistory.length >= 20) {
-            this.chatHistory.shift(); 
+            this.chatHistory.shift(); // Remove o mais antigo
         }
         
-        const messageObject = { role: role, text: cleanedText }; 
+        const messageObject = { role: role, text: cleanedText }; // Usa o cleanedText
         if (!isSilent) {
             this.chatHistory.push(messageObject);
         }
@@ -237,7 +278,7 @@ class WhatsAppBulkManager {
         // COMENTÁRIO DE SEGURANÇA (Anti-Hacking: XSS)
         // Usamos `escapeHtml` para higienizar CADA mensagem (do usuário e da IA)
         // antes de inseri-la no DOM com `innerHTML`. Isso previne XSS.
-        const formattedText = this.escapeHtml(cleanedText).replace(/\n/g, '<br>'); 
+        const formattedText = this.escapeHtml(cleanedText).replace(/\n/g, '<br>'); // Usa o cleanedText
         bubble.innerHTML = formattedText;
 
         messageDiv.appendChild(bubble);
@@ -250,10 +291,12 @@ class WhatsAppBulkManager {
     }
     
     getContactDataSample() {
-        // ... (lógica existente para getContactDataSample) ...
+        // Se os contatos ainda não foram processados, envie uma amostra dos dados brutos
         if (this.processedContacts.length === 0) {
             if (this.contacts.length === 0) return null;
+            // Envia apenas as 5 primeiras linhas de dados brutos
             const sample = this.contacts.slice(0, 5);
+            // Retorna como JSON stringificado para o backend
             return JSON.stringify({
                 status: "processing_not_started",
                 sample_data: sample,
@@ -261,33 +304,46 @@ class WhatsAppBulkManager {
             }, null, 2);
         }
         
+        // Se os contatos foram processados, envie um resumo inteligente
         const validContacts = this.processedContacts.filter(c => c.status !== 'invalid');
         const invalidContacts = this.processedContacts.filter(c => c.status === 'invalid');
 
+        // Pega amostras de ambos
         const validSample = validContacts.slice(0, 5);
-        const invalidSample = invalidContacts.slice(0, 10); 
+        const invalidSample = invalidContacts.slice(0, 10); // Envia mais inválidos, pois são mais prováveis de serem perguntados
+
+        // Pega as colunas mapeadas para enviar os dados corretos
+        const alunoKey = this.alunoColumn.value;
+        const respKey = this.responsavelColumn.value;
+        const turmaKey = this.turmaColumn.value;
+        const phoneKey = this.phoneColumn.value;
 
         const summary = {
             status: "processing_complete",
             total_contacts: this.processedContacts.length,
             total_valid: validContacts.length,
             total_invalid: invalidContacts.length,
+            // Envia os 10 primeiros contatos inválidos
             invalid_contacts_sample: invalidSample.map(c => ({
                 id: c.id,
-                aluno: c.aluno,
-                responsavel: c.responsavel,
-                turma: c.turma,
-                telefone_original: c.originalPhone,
+                aluno: c.originalData[alunoKey] || '',
+                responsavel: c.originalData[respKey] || '',
+                turma: c.originalData[turmaKey] || '',
+                telefone_original: c.originalData[phoneKey] || '',
                 status: c.status
             })),
+            // Envia os 5 primeiros contatos válidos
             valid_contacts_sample: validSample.map(c => ({
                 id: c.id,
-                aluno: c.aluno,
+                aluno: c.originalData[alunoKey] || '',
+                responsavel: c.originalData[respKey] || '',
+                turma: c.originalData[turmaKey] || '',
                 telefone_formatado: c.cleanedPhone,
                 status: c.status
             }))
         };
         
+        // Retorna como JSON stringificado para o backend
         return JSON.stringify(summary, null, 2);
     }
     
@@ -295,6 +351,8 @@ class WhatsAppBulkManager {
         this.chatStatus.classList.remove('hidden');
         
         const dataSample = this.getContactDataSample();
+        
+        // O histórico inclui a mensagem atual do usuário (já adicionada via addMessage)
         const historyPayload = this.chatHistory;
         
         const payload = {
@@ -304,6 +362,7 @@ class WhatsAppBulkManager {
         };
 
         try {
+            // Usa o URL base configurado
             const response = await fetch(`${API_BASE_URL}/api/chat`, { 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -318,16 +377,82 @@ class WhatsAppBulkManager {
             if (!response.ok) {
                  const errorData = await response.json().catch(() => ({ detail: 'Resposta de erro inesperada do servidor.' }));
                  this.addMessage(`Erro da API Chatbot: ${errorData.detail || 'Erro desconhecido.'}`, 'ai');
+                 // Remove a última mensagem do histórico para que o usuário possa tentar novamente sem poluir
                  this.chatHistory.pop();
                  return;
             }
 
             const data = await response.json();
-            this.addMessage(data.response, 'ai');
+            const aiResponseText = data.response;
+
+            // ATUALIZAÇÃO: Verificar se a IA mandou uma ordem de deleção
+            const deleteMatch = aiResponseText.match(/\[DELETE_IDS:\s*([\d,\s]+)\]/);
+
+            if (deleteMatch && deleteMatch[1]) {
+                // A IA quer apagar contatos!
+                const idString = deleteMatch[1];
+                const idsToRemove = idString.split(',')
+                    .map(id => parseInt(id.trim()))
+                    .filter(id => !isNaN(id) && id > 0);
+                
+                // Converte IDs (base 1) para Índices (base 0)
+                const originalIndexesToRemove = idsToRemove.map(id => id - 1);
+                
+                // Pega a mensagem da IA, limpando a tag de deleção
+                const messageToUser = aiResponseText.replace(deleteMatch[0], '').trim();
+
+                // 1. Adiciona a mensagem da IA (ex: "Entendido, preparei 5 contatos...")
+                this.addMessage(messageToUser, 'ai');
+
+                // 2. ATUALIZAÇÃO: Monta a lista de detalhes para confirmação
+                let detailsHtml = '<ul class="list-disc list-inside text-left text-xs bg-gray-100 p-3 rounded-md max-h-40 overflow-y-auto mt-3">';
+                let count = 0;
+                
+                // Pega as colunas mapeadas
+                const alunoKey = this.alunoColumn.value;
+                const respKey = this.responsavelColumn.value;
+                const turmaKey = this.turmaColumn.value;
+                const phoneKey = this.phoneColumn.value;
+
+                for (const index of originalIndexesToRemove) {
+                    const contact = this.contacts[index]; // Pega da lista original
+                    if (contact) {
+                        // Pega os dados das colunas corretas
+                        const aluno = this.escapeHtml(contact[alunoKey] || 'N/A');
+                        const responsavel = this.escapeHtml(contact[respKey] || 'N/A');
+                        const turma = this.escapeHtml(contact[turmaKey] || 'N/A');
+                        const telefone = this.escapeHtml(contact[phoneKey] || 'N/A');
+                        
+                        // Adiciona na lista HTML
+                        detailsHtml += `<li><strong>${aluno}</strong> (Resp: ${responsavel}, Turma: ${turma}, Tel: ${telefone})</li>`;
+                        count++;
+                    }
+                }
+                detailsHtml += '</ul>';
+
+
+                // 3. Pede confirmação
+                if (count > 0) {
+                    // Monta a mensagem final para o modal
+                    const confirmationMessage = `<p>A IA preparou <strong>${count} contato(s)</strong> para remoção. Por favor, confirme os detalhes abaixo:</p> ${detailsHtml}`;
+                    
+                    this.showConfirmationModal(
+                        'Remoção via IA',
+                        confirmationMessage,
+                        () => {
+                            this.removeContactsBatch(originalIndexesToRemove);
+                        }
+                    );
+                }
+            } else {
+                // Resposta normal da IA (sem deleção)
+                this.addMessage(aiResponseText, 'ai');
+            }
 
         } catch (error) {
             console.error('Chat API Error:', error);
             this.addMessage('Desculpe, não foi possível conectar ao assistente de AI. Verifique se o backend do Render está ativo.', 'ai');
+            // Remove a última mensagem do histórico em caso de falha de conexão
             this.chatHistory.pop();
         } finally {
             this.chatStatus.classList.add('hidden');
@@ -353,15 +478,16 @@ class WhatsAppBulkManager {
     }
 
     async processFile(file) {
-        // ... (lógica existente de processFile) ...
         if (!file.name.match(/\.(xlsx|xls|csv)$/i)) {
             this.showError('Por favor, carregue um arquivo Excel ou CSV válido');
             return;
         }
+
         if (file.size > 10 * 1024 * 1024) {
             this.showError('O tamanho do arquivo deve ser inferior a 10MB');
             return;
         }
+
         this.currentFile = file;
         this.showFileInfo(file);
         
@@ -372,6 +498,7 @@ class WhatsAppBulkManager {
             this.hideProgress();
             
             this.showMappingSection();
+            // Tenta a detecção e mapeamento automáticos
             await this.detectColumns(true);
 
         } catch (error) {
@@ -407,7 +534,7 @@ class WhatsAppBulkManager {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
-    // ... (lógica de Mapeamento de Coluna, detectColumns, findHeuristicColumn) ...
+    // Column Mapping
     showMappingSection() {
         this.populateColumnSelectors();
         this.mappingSection.classList.remove('hidden');
@@ -416,8 +543,11 @@ class WhatsAppBulkManager {
 
     populateColumnSelectors() {
         if (this.contacts.length === 0) return;
+
         const headers = Object.keys(this.contacts[0]);
         this.columns = headers;
+
+        // Limpa e popula todos os seletores
         [this.alunoColumn, this.phoneColumn, this.responsavelColumn, this.turmaColumn].forEach(select => {
             select.innerHTML = '<option value="">Selecione a coluna...</option>';
             headers.forEach(header => {
@@ -425,29 +555,36 @@ class WhatsAppBulkManager {
             });
         });
     }
-    
+
     async detectColumns(autoMode = false) {
         if (this.columns.length === 0) return;
+
         if (autoMode) {
              this.aiStatus.classList.remove('hidden');
              this.aiStatus.querySelector('span').textContent = 'AI detectando e mapeando colunas...';
         }
+        
         try {
             const payload = {
                 headers: this.columns,
-                sample_data: this.contacts.slice(0, 5) 
+                sample_data: this.contacts.slice(0, 5) // Envia uma amostra
             };
+            
             const response = await fetch(`${API_BASE_URL}/api/detect-columns`, { 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
+
             if (!response.ok) {
                  const errorData = await response.json().catch(() => ({ detail: 'Resposta de erro inesperada do servidor.' }));
                  throw new Error(errorData.detail || 'AI detection failed');
             }
+            
             const result = await response.json();
             
+            // Mapeamento usando as chaves de AI (name_key e number_key são genéricos)
+            // Name Key é mapeado para Coluna do Aluno (Nome Principal)
             if (result.name_key && this.columns.includes(result.name_key)) {
                 this.alunoColumn.value = result.name_key;
             }
@@ -455,6 +592,7 @@ class WhatsAppBulkManager {
                 this.phoneColumn.value = result.number_key;
             }
             
+            // Tentativa heurística para os outros campos (Responsável e Turma)
             this.responsavelColumn.value = this.findHeuristicColumn(this.columns, ['responsavel', 'resp', 'nome responsavel', 'nome_responsavel']);
             this.turmaColumn.value = this.findHeuristicColumn(this.columns, ['turma', 'class', 'sala', 'serie']);
 
@@ -473,6 +611,7 @@ class WhatsAppBulkManager {
         }
     }
     
+    // Helper para encontrar colunas por heurística
     findHeuristicColumn(headers, patterns) {
         for (const header of headers) {
             const lowerHeader = header.toLowerCase().replace(/[^a-z0-9]/g, ' ');
@@ -519,21 +658,28 @@ class WhatsAppBulkManager {
         this.contacts.forEach((contact, index) => {
             const aluno = contact[alunoKey] || 'Não Informado';
             const phone = contact[phoneKey] || '';
-            const cleaningResult = NumberCleaner.clean(phone); 
             
+            // Limpa o número e captura DDD e status
+            const cleaningResult = NumberCleaner.clean(phone); 
+            const status = cleaningResult.status;
+
             const contactData = {
                 id: index + 1, // ID é (índice original + 1)
-                name: aluno.toString().trim(), 
+                name: aluno.toString().trim(), // O nome principal para o template
                 originalPhone: phone.toString().trim(),
                 cleanedPhone: cleaningResult.cleanedPhone,
                 ddd: cleaningResult.ddd, 
-                status: cleaningResult.status,
+                status: status,
+                
+                // Dados adicionais para relatório de erro / tabela
                 responsavel: contact[responsavelKey] || 'Não Informado',
                 aluno: aluno,
                 turma: contact[turmaKey] || 'Não Informado',
+                
                 originalData: contact
             };
             
+            // Regra de invalidação
             if (status === 'invalid') {
                 invalidList.push(contactData);
             } else {
@@ -541,6 +687,7 @@ class WhatsAppBulkManager {
             }
         });
         
+        // Junta as listas, colocando inválidos no final
         this.processedContacts = processedList.concat(invalidList);
     }
 
@@ -604,10 +751,10 @@ class WhatsAppBulkManager {
             tbody.appendChild(row);
         });
     }
-
+    
     // NOVO: Funções de Remoção de Contato
     
-    // 1. Mostra o modal de confirmação
+    // 1. Mostra o modal de confirmação (para clique manual)
     confirmRemoveContact(originalIndex) {
         // Encontra o contato na lista original
         const contact = this.contacts[originalIndex];
@@ -617,29 +764,44 @@ class WhatsAppBulkManager {
         const alunoKey = this.alunoColumn.value;
         const contactName = (alunoKey ? contact[alunoKey] : `Linha ${originalIndex + 1}`) || `Linha ${originalIndex + 1}`;
 
+        // ATUALIZAÇÃO: Mensagem de confirmação
+        const confirmationMessage = `<p>Tem certeza que deseja remover <strong>${this.escapeHtml(contactName)}</strong> da lista? Esta ação não pode ser desfeita.</p>`;
+
         this.showConfirmationModal(
             'Confirmar Remoção',
-            `Tem certeza que deseja remover <strong>${this.escapeHtml(contactName)}</strong> da lista? Esta ação não pode ser desfeita.`,
+            confirmationMessage,
             () => {
-                this.removeContact(originalIndex);
+                // ATUALIZAÇÃO: Chama a nova função de remoção em lote
+                this.removeContactsBatch([originalIndex]);
             }
         );
     }
     
-    // 2. Remove o contato da fonte da verdade (`this.contacts`) e atualiza a UI
-    removeContact(originalIndex) {
-        if (originalIndex > -1 && originalIndex < this.contacts.length) {
-            // Remove da fonte da verdade
-            const removed = this.contacts.splice(originalIndex, 1);
-            
-            // Dispara a atualização completa da UI
-            // Isso reconstrói `processedContacts` e re-renderiza a tabela
-            this.updatePreview();
-            
-            this.showSuccess('Contato removido com sucesso.');
-        } else {
-            this.showError('Erro: Não foi possível encontrar o índice do contato.');
+    // 2. ATUALIZAÇÃO: Renomeada de `removeContact` para `removeContactsBatch`
+    // Remove um ou mais contatos da fonte da verdade (`this.contacts`) e atualiza a UI
+    removeContactsBatch(originalIndexes) {
+        if (!originalIndexes || originalIndexes.length === 0) {
+            this.showError('Erro: Nenhum índice fornecido para remoção.');
+            return;
         }
+
+        // Filtra a lista original, mantendo apenas os que NÃO estão na lista de remoção
+        // Ordena os índices em ordem decrescente para evitar problemas ao remover com splice
+        const sortedIndexes = originalIndexes.sort((a, b) => b - a);
+
+        let removedCount = 0;
+        for (const index of sortedIndexes) {
+            if (index > -1 && index < this.contacts.length) {
+                this.contacts.splice(index, 1);
+                removedCount++;
+            }
+        }
+            
+        // Dispara a atualização completa da UI
+        // Isso reconstrói `processedContacts` e re-renderiza a tabela
+        this.updatePreview();
+        
+        this.showSuccess(`${removedCount} contato(s) removido(s).`);
     }
     // --- Fim da Lógica de Remoção ---
 
@@ -648,13 +810,12 @@ class WhatsAppBulkManager {
         switch (status) {
             case 'valid': return '<i class="fas fa-check-circle"></i> Válido';
             case 'invalid': return '<i class="fas fa-times-circle"></i> Inválido';
-            default: return 'Inválido';
+            default: return 'Inválido'; // Deve ser sempre valid ou invalid após a limpeza
         }
     }
 
-    // ... (funções de updateContactName/Phone removidas para simplificar,
-    // a remoção é a principal forma de edição) ...
-    
+
+    // Message Composer
     showMessageSection() {
         this.messageSection.classList.remove('hidden');
         this.messageSection.classList.add('fade-in');
@@ -675,10 +836,10 @@ class WhatsAppBulkManager {
             // ele será renderizado como texto puro, e não executado.
             this.messagePreview.textContent = preview;
         } else {
-            this.messagePreview.textContent = "";
+            this.messagePreview.textContent = ""; // Limpa a prévia se não houver contatos
         }
 
-        // ... (lógica de contagem de caracteres) ...
+        // Update character count color
         if (template.length > 4096) {
             this.charCount.className = 'text-xs text-red-500 font-medium';
         } else if (template.length > 3500) {
@@ -689,19 +850,25 @@ class WhatsAppBulkManager {
     }
 
     replacePlaceholders(template, contact) {
-        // ... (lógica existente de replacePlaceholders) ...
         let result = template;
+        // Substitui {name} pelo nome do aluno
         result = result.replace(/{name}/g, contact.name || 'Nome_do_Aluno');
+        
+        // Substitui outros campos personalizados
         Object.keys(contact.originalData).forEach(key => {
             const placeholder = `{${key}}`;
             result = result.replace(new RegExp(placeholder, 'g'), contact.originalData[key] || '');
         });
+
+        // Adiciona placeholders explícitos para os campos mapeados (caso o usuário use-os)
         result = result.replace(/{aluno}/g, contact.aluno || '');
         result = result.replace(/{responsavel}/g, contact.responsavel || '');
         result = result.replace(/{turma}/g, contact.turma || '');
+
         return result;
     }
 
+    // Mode Toggle
     toggleMode() {
         this.mode = this.modeToggle.value;
         
@@ -716,25 +883,31 @@ class WhatsAppBulkManager {
         }
     }
 
+    // Action Section
     showActionSection() {
         this.actionSection.classList.remove('hidden');
         this.actionSection.classList.add('fade-in');
-        this.toggleMode(); 
+        this.toggleMode(); // Update button visibility
     }
 
     // --- Lógica de Geração e Envio ---
 
+    // VCF Generation
     async generateVCF() {
         const validContacts = this.processedContacts.filter(c => c.status !== 'invalid');
+        
         if (validContacts.length === 0) {
             this.showError('Nenhum contato válido para gerar arquivo VCF');
             return;
         }
+
         this.showProgress('Gerando Arquivo VCF', `Processando ${validContacts.length} contatos...`);
+
         try {
             const vcfContent = VCFGenerator.generate(validContacts);
             const blob = new Blob([vcfContent], { type: 'text/vcard' });
             const url = URL.createObjectURL(blob);
+            
             const a = document.createElement('a');
             a.href = url;
             a.download = `contacts_${new Date().getTime()}.vcf`;
@@ -742,8 +915,10 @@ class WhatsAppBulkManager {
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+
             this.hideProgress();
             this.showSuccess(`Arquivo VCF gerado com ${validContacts.length} contatos`);
+
         } catch (error) {
             this.hideProgress();
             this.showError('Erro ao gerar arquivo VCF: ' + error.message);
@@ -758,6 +933,7 @@ class WhatsAppBulkManager {
         const vcfContent = VCFGenerator.generateSingle(contact);
         const blob = new Blob([vcfContent], { type: 'text/vcard' });
         const url = URL.createObjectURL(blob);
+        
         const a = document.createElement('a');
         a.href = url;
         // COMENTÁRIO DE SEGURANÇA (Anti-Hacking: Sanitização)
@@ -770,22 +946,27 @@ class WhatsAppBulkManager {
         URL.revokeObjectURL(url);
     }
 
+    // WhatsApp Cloud API
     async sendMessages() {
-        // ... (lógica existente de sendMessages) ...
         const credentials = this.getApiCredentials();
-        if (!this.validateCredentials(credentials)) return;
-        
+        if (!this.validateCredentials(credentials)) {
+            return;
+        }
+
         const validContacts = this.processedContacts.filter(c => c.status !== 'invalid');
         if (validContacts.length === 0) {
             this.showError('Nenhum contato válido para enviar mensagens');
             return;
         }
+
         const messageTemplate = this.messageTemplate.value;
         if (!messageTemplate.trim() && !credentials.templateName) {
             this.showError('Por favor, insira um modelo de mensagem ou um nome de template aprovado.');
             return;
         }
+
         this.showProgress('Enviando Mensagens', `Iniciando envio para ${validContacts.length} contatos...`);
+
         try {
             const results = await WhatsAppAPI.sendBatch({
                 contacts: validContacts,
@@ -795,10 +976,14 @@ class WhatsAppBulkManager {
                     this.updateProgress(progress.current, progress.total, progress.message);
                 }
             });
+
             this.hideProgress();
+            
             const successCount = results.success;
             const failedCount = results.failed;
+
             this.showSuccess(`Envio concluído. Sucesso: ${successCount}, Falha: ${failedCount}`);
+
         } catch (error) {
             this.hideProgress();
             this.showError('Erro ao enviar mensagens: ' + error.message);
@@ -826,7 +1011,7 @@ class WhatsAppBulkManager {
         return true;
     }
 
-    // ... (lógica de State Management) ...
+    // State Management
     saveApiConfig() {
         const config = this.getApiCredentials();
         // COMENTÁRIO DE SEGURANÇA (LGPD: Senhas e Autenticação)
@@ -834,7 +1019,9 @@ class WhatsAppBulkManager {
         // `localStorage` pois é limpo quando a aba é fechada.
         sessionStorage.setItem('whatsapp_api_config', JSON.stringify(config));
     }
+
     loadSavedState() {
+        // Load API config from sessionStorage
         const savedConfig = sessionStorage.getItem('whatsapp_api_config');
         if (savedConfig) {
             try {
@@ -843,26 +1030,31 @@ class WhatsAppBulkManager {
                 this.phoneNumberId.value = config.phoneNumberId || '';
                 this.templateName.value = config.templateName || '';
                 this.languageCode.value = config.languageCode || 'pt_BR';
-            } catch (error) { console.error('Erro ao carregar configuração salva:', error); }
+            } catch (error) {
+                console.error('Erro ao carregar configuração salva:', error);
+            }
         }
+
+        // Load mode from localStorage
         const savedMode = localStorage.getItem('whatsapp_mode');
         if (savedMode) {
             this.modeToggle.value = savedMode;
             this.mode = savedMode;
         }
     }
-    
+
     // --- Lógica de Modais e Notificações (ATUALIZADA) ---
 
     // NOVO: Modal de Confirmação Genérico
-    showConfirmationModal(title, message, onConfirm) {
+    showConfirmationModal(title, messageHtml, onConfirm) {
         // COMENTÁRIO DE SEGURANÇA (Anti-Hacking: XSS)
         // O `title` é inserido com `.textContent` (seguro).
-        // A `message` é inserida com `.innerHTML`, mas ela é 
-        // construída internamente (ex: `confirmRemoveContact`)
-        // e usa `escapeHtml` para higienizar qualquer dado do usuário.
+        // A `messageHtml` é inserida com `.innerHTML`.
+        // A responsabilidade de higienizar (escapar) os dados do usuário
+        // (como nomes de alunos) agora está NAS FUNÇÕES QUE CHAMAM ESTE MODAL
+        // (ex: `confirmRemoveContact` e `callChatAPI`).
         this.confirmTitle.textContent = title;
-        this.confirmText.innerHTML = message;
+        this.confirmText.innerHTML = messageHtml;
         
         // Remove ouvintes antigos para evitar cliques duplos
         if (this.pendingConfirmAction) {
@@ -883,6 +1075,7 @@ class WhatsAppBulkManager {
         document.getElementById(modalId).classList.add('hidden');
     }
 
+    // Progress Management
     showProgress(title, message) {
         document.getElementById('progressTitle').textContent = title;
         document.getElementById('progressText').textContent = message;
@@ -906,19 +1099,26 @@ class WhatsAppBulkManager {
         this.hideModal('progressModal');
     }
 
-    showError(message) { this.showToast(message, 'error'); }
-    showSuccess(message) { this.showToast(message, 'success'); }
+    // Utility Methods
+    showError(message) {
+        this.showToast(message, 'error');
+    }
+
+    showSuccess(message) {
+        this.showToast(message, 'success');
+    }
 
     showToast(message, type) {
         const toast = document.createElement('div');
-        toast.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 ${
+        toast.className = `fixed top-4 right-4 p-4 rounded-lg shadow-lg z-[1005] ${
             type === 'error' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'
-        }`;
+        }`; // Z-index alto
         // COMENTÁRIO DE SEGURANÇA (Anti-Hacking: XSS)
         // Mensagens de sistema (erros, sucesso) são inseridas com
         // `.textContent` para garantir que sejam seguras.
         toast.textContent = message;
         document.body.appendChild(toast);
+        
         setTimeout(() => {
             if (document.body.contains(toast)) {
                 document.body.removeChild(toast);
@@ -941,12 +1141,16 @@ class ExcelParser {
     static async parse(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
+            
             reader.onload = (e) => {
                 try {
                     const data = new Uint8Array(e.target.result);
+                    // Força a leitura de datas como texto
                     const workbook = XLSX.read(data, { type: 'array', cellDates: false }); 
                     const sheetName = workbook.SheetNames[0];
+                    // Mantém os tipos de dados originais (raw) para evitar corrompimento
                     const worksheet = workbook.Sheets[sheetName]; 
+                    // Transforma para JSON, usando a primeira linha como cabeçalho
                     const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
                     
                     if (json.length < 2) {
@@ -972,50 +1176,83 @@ class ExcelParser {
                     reject(error);
                 }
             };
+            
             reader.onerror = () => reject(new Error('Falha ao ler o arquivo'));
             reader.readAsArrayBuffer(file);
         });
     }
 }
 
+// Number Cleaner Module (Lógica de validação simplificada)
 class NumberCleaner {
+    
+    // NOVO: Retorna um objeto com o número limpo, DDD e o status
     static clean(number) {
         if (!number) {
             return { cleanedPhone: '', ddd: '', status: 'invalid' };
         }
+        
+        // 1. Primeira limpeza: Remove tudo que não for dígito
         let digits = number.toString().replace(/\D/g, '');
+        
+        // 2. Retirar os 2 primeiros caracteres se eles forem == 55 (DDI Brasil)
         if (digits.startsWith('55')) {
             digits = digits.substring(2);
         }
+        
+        // Se o número começar com '0', remover (comum em discagens de longa distância)
         if (digits.startsWith('0')) {
             digits = digits.substring(1);
         }
+
+        // Se o número for muito curto para ter DDD + 8 dígitos, é inválido
         if (digits.length < 10) { 
             return { cleanedPhone: number.toString(), ddd: '', status: 'invalid' };
         }
+        
+        // 3. Conferir e salvar o DDD (2 primeiros dígitos)
         const ddd = digits.substring(0, 2);
         let numberPart = digits.substring(2);
+        
+        // 4. Tratamento do dígito 9:
         if (numberPart.length === 9 && numberPart.startsWith('9')) {
+            // Número móvel completo (9 + 8 dígitos). Normaliza para 8 dígitos para reconstrução
             numberPart = numberPart.substring(1); 
         } else if (numberPart.length === 8) {
-            // Número válido
+            // Número fixo ou móvel legado (8 dígitos).
+            // A API do WhatsApp (E.164) agora recomenda adicionar o 9
         } else {
+            // Número tem 7, 10, ou mais de 11 dígitos, o que é inválido no padrão móvel
             return { cleanedPhone: number.toString(), ddd: ddd, status: 'invalid' };
         }
+        
+        // 5. Conferir se sobrou exatamente 8 dígitos (Validação final)
         if (numberPart.length !== 8) { 
+            // Inválido: Se a lógica anterior foi ignorada, o número não é válido
             return { cleanedPhone: number.toString(), ddd: ddd, status: 'invalid' };
         }
+        
+        // Construção do número E.164 (sempre +55 + DDD + 9 + 8 dígitos)
         const finalNumber = `+55${ddd}9${numberPart}`;
+        
+        // Determinação do Status: Se sobrou 8 dígitos após toda a limpeza e normalização, é válido.
         const status = 'valid';
+        
         return { cleanedPhone: finalNumber, ddd: ddd, status: status };
     }
 }
 
+
+// VCF Generator Module
 class VCFGenerator {
     static generate(contacts) {
+        // Filtra contatos com telefone limpo
         const vcards = contacts
             .filter(c => c.cleanedPhone && c.cleanedPhone.startsWith('+'))
             .map(contact => this.generateSingle(contact));
+            
+        // Adiciona cabeçalho e rodapé VCF. Note que 'BEGIN' e 'END' já estão em generateSingle.
+        // Apenas junta as vcards.
         return vcards.join('\n');
     }
 
@@ -1026,6 +1263,7 @@ class VCFGenerator {
         const name = (contact.name || 'Unknown').replace(/[\n\r;]/g, ' ');
         const phone = contact.cleanedPhone || '';
         
+        // O vCard requer N e FN
         return `BEGIN:VCARD
 VERSION:3.0
 FN:${name}
@@ -1035,18 +1273,25 @@ END:VCARD`;
     }
 }
 
+// WhatsApp API Module
 class WhatsAppAPI {
+    // Implementação de alto nível para enviar lotes, usando o backend Render para processamento
     static async sendBatch({ contacts, message, credentials, onProgress }) {
+        // Filtra apenas contatos válidos para o envio
         const validContacts = contacts.filter(c => c.status !== 'invalid');
+        
         if (validContacts.length === 0) {
-            throw new Error("Não há contatos válidos para envio.");
+            throw new Error("Não há contatos válidos para envio após a validação.");
         }
+
         const payload = {
             contacts: validContacts,
             message: message,
             credentials: credentials
         };
+
         try {
+            // 1. Inicia o Job de envio
             const response = await fetch(`${API_BASE_URL}/api/send-whatsapp-batch`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1065,24 +1310,29 @@ class WhatsAppAPI {
             const jobId = jobData.jobId;
             const totalContacts = jobData.totalContacts;
             
+            // 2. Inicia o Polling para o status do job
             let status = 'processing';
             let totalSent = 0;
             let totalFailed = 0;
             let results = [];
 
             while (status === 'processing') {
+                // Espera 3 segundos antes do próximo poll (reduz o load no Redis e no servidor)
                 await new Promise(resolve => setTimeout(resolve, 3000));
                 
                 try {
                     const statusResponse = await fetch(`${API_BASE_URL}/api/job-status/${jobId}`);
+                    
+                    // Trata erro 503 (Serviço indisponível, ex: Redis não configurado)
                     if (statusResponse.status === 503) {
                          throw new Error('Rastreamento de trabalho (Job tracking) indisponível. Verifique a configuração do Redis no backend.');
                     }
+
                     if (!statusResponse.ok) {
-                        const errorDetail = await statusResponse.json().catch(() => ({ detail: 'Erro de rede desconhecido' }));
-                        console.warn(`Falha ao obter status (tentando novamente): ${errorDetail.detail}`);
-                        await new Promise(resolve => setTimeout(resolve, 2000)); // Espera extra
-                        continue; // Tenta o loop novamente
+                         const errorDetail = await statusResponse.json().catch(() => ({ detail: 'Erro de rede desconhecido' }));
+                         console.warn(`Falha ao obter status (tentando novamente): ${errorDetail.detail}`);
+                         await new Promise(resolve => setTimeout(resolve, 2000)); // Espera extra
+                         continue; // Tenta o loop novamente
                     }
                     
                     const statusData = await statusResponse.json();
@@ -1090,7 +1340,7 @@ class WhatsAppAPI {
                     totalSent = statusData.completed || 0;
                     totalFailed = statusData.failed || 0;
                     results = statusData.results || [];
-
+                    
                     if (onProgress) {
                         onProgress({
                             current: totalSent + totalFailed,
@@ -1106,6 +1356,7 @@ class WhatsAppAPI {
                 }
             }
             
+            // 3. Retorna o resultado final
             return {
                 total: totalContacts,
                 success: totalSent,
