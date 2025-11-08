@@ -2,6 +2,6 @@ fastapi==0.104.1
 uvicorn==0.24.0
 httpx==0.25.1
 redis==5.0.1
-pydantic==2.4.2
+pydantic==2.7.4  # Versão atualizada para resolver o erro de compilação 'Read-only file system' (Pydantic Core/Maturin).
 python-multipart==0.0.6
 python-dotenv==1.0.0
