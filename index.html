@@ -357,13 +357,13 @@
         </div>
     </main>
 
-    <!-- Chatbot Floating Button -->
-    <button id="chatToggleBtn" class="fixed bottom-6 right-6 p-4 rounded-full shadow-lg transition-all z-1000" title="Ajuda da IA">
+    <!-- Chatbot Floating Button (Z-index ATUALIZADO) -->
+    <button id="chatToggleBtn" class="fixed bottom-6 right-6 p-4 rounded-full shadow-lg transition-all z-[1001]" title="Ajuda da IA">
         <i class="fas fa-robot text-xl"></i>
     </button>
 
-    <!-- Chatbot Container (Hidden by default) -->
-    <div id="chatContainer" class="chat-container hidden">
+    <!-- Chatbot Container (ATUALIZADO: Classes de posicionamento, tamanho e animação) -->
+    <div id="chatContainer" class="chat-container fixed right-6 bottom-[5.5rem] w-full max-w-sm z-[1000] transition-all duration-300 ease-in-out opacity-0 scale-95 -translate-y-4 pointer-events-none">
         <div class="chat-window rounded-lg">
             <!-- Chat Header -->
             <div class="chat-header flex justify-between items-center">
@@ -372,8 +372,8 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            <!-- Messages -->
-            <div id="chatMessages" class="chat-messages flex flex-col space-y-2">
+            <!-- Messages (ATUALIZADO: Altura fixa e scroll) -->
+            <div id="chatMessages" class="chat-messages flex flex-col space-y-2 h-[400px] overflow-y-auto">
                 <!-- 
                     COMENTÁRIO DE SEGURANÇA (Anti-Hacking: XSS):
                     As mensagens são inseridas aqui via main.js, função addMessage(), 
@@ -396,8 +396,8 @@
         </div>
     </div>
 
-    <!-- Progress Modal -->
-    <div id="progressModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop hidden flex items-center justify-center z-50 p-4">
+    <!-- Progress Modal (Z-index ATUALIZADO) -->
+    <div id="progressModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop hidden flex items-center justify-center z-[1002] p-4">
         <div class="modal-content w-full max-w-md">
             <div class="flex justify-between items-center mb-4">
                 <h3 id="progressTitle" class="text-lg font-semibold text-gray-900">Processando Contatos</h3>
@@ -423,11 +423,15 @@
         </div>
     </div>
     
-    <!-- NOVO: Confirmation Modal (para remoção) -->
-    <div id="confirmationModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop hidden flex items-center justify-center z-50 p-4">
+    <!-- Confirmation Modal (ATUALIZADO: Z-index e estrutura do confirmText) -->
+    <div id="confirmationModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop hidden flex items-center justify-center z-[1003] p-4">
         <div class="modal-content w-full max-w-md">
             <h3 id="confirmTitle" class="text-lg font-semibold text-gray-900 mb-4">Confirmar Remoção</h3>
-            <p id="confirmText" class="text-sm text-gray-600 mb-6">Tem certeza que deseja remover este contato da lista?</p>
+            <!-- ATUALIZAÇÃO: A mensagem (e a lista de detalhes) será inserida aqui -->
+            <div id="confirmText" class="text-sm text-gray-600 mb-6 space-y-3">
+                <!-- Ex: "A IA preparou..." -->
+                <!-- Ex: <ul class="list-disc...">...</ul> -->
+            </div>
             
             <div class="flex justify-end space-x-3">
                 <button id="confirmCancelBtn" class="btn bg-gray-200 text-gray-800 hover:bg-gray-300">
@@ -441,8 +445,8 @@
     </div>
 
 
-    <!-- Help Modal (ATUALIZADO COM TODAS AS PROTEÇÕES SOLICITADAS) -->
-    <div id="helpModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop hidden flex items-center justify-center z-50 p-4">
+    <!-- Help Modal (ATUALIZADO: Z-index e max-width) -->
+    <div id="helpModal" class="fixed inset-0 bg-black bg-opacity-50 modal-backdrop hidden flex items-center justify-center z-[1002] p-4">
         <div class="modal-content w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-semibold text-gray-900">Ajuda, Segurança e Conformidade (LGPD)</h3>
@@ -459,7 +463,7 @@
                         <li><strong>Passo 1:</strong> Carregue um arquivo Excel (.xlsx, .xls) ou CSV.</li>
                         <li><strong>Passo 2:</strong> O site tentará adivinhar as colunas. Confira se "Nome do Aluno" e "Telefone" estão corretos.</li>
                         <li><strong>Ajuda da IA:</strong> A qualquer momento, clique no <strong>robô roxo</strong> para tirar dúvidas sobre seus dados ou sobre o site.</li>
-                        <li><strong>Remover Contato:</strong> Você pode clicar no ícone de lixeira (<i class="fas fa-trash-alt"></i>) na tabela para remover um contato, ou pedir à IA (ex: "Remover contato João da Silva").</li>
+                        <li><strong>Remover Contato:</strong> Você pode clicar no ícone de lixeira (<i class="fas fa-trash-alt"></i>) na tabela para remover um contato, ou pedir à IA (ex: "Remover contato João da Silva", "Remover todos os inválidos").</li>
                         <li><strong>Passo 3:</strong> Escreva a mensagem. Use `{name}` para o nome do aluno.</li>
                         <li><strong>Passo 4 (Escolha o Modo):</strong> No topo da página, escolha seu objetivo (Modo 1 ou Modo 2).</li>
                     </ol>
@@ -469,11 +473,6 @@
                 ================================================================================
                 | SEÇÃO DE SEGURANÇA (LGPD E ANTI-HACKING) - ATUALIZADA (8 Nov 2025)
                 ================================================================================
-                |
-                | Esta seção traduz as proteções técnicas (da sua lista) para
-                | uma linguagem que o usuário final entende, implementando os
-                | princípios da LGPD de "Governança" e "Transparência".
-                |
                 -->
                 <div>
                     <h4 class="font-medium text-gray-900 mb-2">Nossa Política de Segurança e LGPD (Atualizado em 8 de Novembro de 2025)</h4>
