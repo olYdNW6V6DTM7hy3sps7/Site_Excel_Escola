@@ -259,19 +259,13 @@
             </div>
         </div>
 
-        <!-- API Configuration Section -->
+        <!-- API Configuration Section (ATUALIZADO COM GUIA PARA LEIGOS) -->
         <div id="apiConfigSection" class="content-card hidden">
             <h2 class="card-title">Passo 3.5: Configurar Envio Automático (Modo API)</h2>
             <p class="text-sm text-gray-500 -mt-6 mb-4">Este passo é técnico. Preencha isto *apenas* se você escolheu o "Modo 2: Envio Automático".</p>
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                    <!--
-                        COMENTÁRIO DE SEGURANÇA (LGPD: Senhas e Autenticação / Eng. Social):
-                        Usamos `type="password"` para mascarar o token de acesso.
-                        Isso impede que alguém veja o token "por cima do ombro"
-                        (Engenharia Social).
-                    -->
                     <label class="form-label" for="accessToken">Token de Acesso da API</label>
                     <input type="password" id="accessToken" class="form-input" placeholder="EAAxxxxxxxx... (segredo)">
                 </div>
@@ -294,18 +288,67 @@
                 </div>
             </div>
 
+            <!--
+            ================================================================================
+            | NOVO: GUIA PARA LEIGOS (Conforme solicitado)
+            ================================================================================
+            -->
+            <div class="mt-8 pt-6 border-t border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900 mb-3">Guia Rápido (para Leigos): Onde encontrar estas informações?</h3>
+                <p class="text-sm text-gray-600 mb-4">
+                    Todas essas chaves são encontradas dentro da sua conta de <a href="https://developers.facebook.com/" target="_blank" class="text-blue-600 hover:underline">Desenvolvedor da Meta (Facebook)</a>, após você configurar um Aplicativo e a API do WhatsApp.
+                </p>
+
+                <div class="space-y-4">
+                    <!-- Passo 1: ID do Número -->
+                    <div class="flex items-start">
+                        <span class="flex-shrink-0 w-8 h-8 bg-primary-color text-white rounded-full flex items-center justify-center font-bold text-sm mr-4">1</span>
+                        <div>
+                            <h4 class="font-semibold text-gray-800">ID do Número de Telefone</h4>
+                            <p class="text-sm text-gray-600">
+                                No seu aplicativo da Meta, vá para <strong class="text-gray-900">"WhatsApp" > "Configuração da API"</strong>.
+                                O <strong class="text-gray-900">"ID do número de telefone"</strong> estará visível logo no topo, na seção "1. Enviar mensagens com a API".
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Passo 2: Token de Acesso -->
+                    <div class="flex items-start">
+                        <span class="flex-shrink-0 w-8 h-8 bg-primary-color text-white rounded-full flex items-center justify-center font-bold text-sm mr-4">2</span>
+                        <div>
+                            <h4 class="font-semibold text-gray-800">Token de Acesso da API</h4>
+                            <p class="text-sm text-gray-600">
+                                Na <strong class="text-gray-900">mesma página</strong> ("Configuração da API"), role para baixo até a seção <strong class="text-gray-900">"2. Enviar mensagens com a API"</strong>.
+                                Você verá um campo chamado <strong class="text-gray-900">"Token de acesso temporário"</strong>. Clique em "Copiar" e cole aqui.
+                            </p>
+                            <p class="text-xs text-red-600 mt-1">
+                                <i class="fas fa-exclamation-triangle mr-1"></i><strong>Atenção:</strong> Este token expira a cada 23 horas. Para um envio profissional, você deve gerar um "Token de Acesso Permanente" (uma configuração mais avançada na Meta).
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Passo 3: Nome do Template -->
+                    <div class="flex items-start">
+                        <span class="flex-shrink-0 w-8 h-8 bg-gray-600 text-white rounded-full flex items-center justify-center font-bold text-sm mr-4">3</span>
+                        <div>
+                            <h4 class="font-semibold text-gray-800">Nome do Template (Opcional)</h4>
+                            <p class="text-sm text-gray-600">
+                                <strong>Opção A (Recomendada):</strong> Deixe este campo <strong class="text-gray-900">vazio</strong>. O sistema enviará a mensagem que você escreveu no "Passo 3" (acima).
+                            </p>
+                            <p class="text-sm text-gray-600 mt-1">
+                                <strong>Opção B (Avançada):</strong> Se você criou um "Modelo de Mensagem" pré-aprovado pela Meta (na seção "2. Criar modelos de mensagem"), você pode colocar o <strong class="text-gray-900">nome exato</strong> dele aqui (ex: `aviso_de_reuniao`).
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- FIM DO GUIA PARA LEIGOS -->
+
             <div class="mt-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
                 <div class="flex items-start">
                     <i class="fas fa-exclamation-triangle text-yellow-600 mt-0.5 mr-3"></i>
                     <div class="text-sm text-yellow-800">
                         <p class="font-medium">Aviso de Segurança (LGPD: Retenção de Dados)</p>
-                        <!--
-                            COMENTÁRIO DE SEGURANÇA (LGPD: Senhas e Autenticação):
-                            Informamos ao usuário (Princípio da Transparência)
-                            que sua "senha" (token) é salva no `sessionStorage`
-                            (veja main.js, função `saveApiConfig`), que é
-                            mais seguro que `localStorage` pois é temporário.
-                        -->
                         <p>Suas credenciais de API são armazenadas apenas temporariamente no seu navegador e nunca são enviadas ao nosso servidor.</p>
                     </div>
                 </div>
@@ -322,12 +365,6 @@
                     <i class="fas fa-address-book text-secondary-color text-2xl mr-3"></i>
                     <h3>Modo 1: Baixar Contatos (para Celular)</h3>
                 </div>
-                <!--
-                    COMENTÁRIO DE SEGURANÇA (LGPD: Minimização de Dados):
-                    Explicamos que este modo é 100% offline.
-                    Os dados do usuário NUNCA tocam a internet.
-                    Esta é a melhor proteção de privacidade possível.
-                -->
                 <p>
                     Isso cria um arquivo mágico de "Contatos" (chamado VCF). Você envia esse arquivo para o seu celular, abre ele, e <strong>todos os contatos válidos são salvos na sua agenda de uma só vez!</strong> (100% offline e privado).
                 </p>
@@ -342,11 +379,6 @@
                      <i class="fas fa-robot text-primary-color text-2xl mr-3"></i>
                     <h3>Modo 2: Envio Automático (Avançado)</h3>
                 </div>
-                <!--
-                    COMENTÁRIO DE SEGURANÇA (LGPD: Transparência):
-                    Explicamos que este modo *usa* a internet e envia
-                    os dados para o backend (que os repassa para o WhatsApp).
-                -->
                 <p>
                     Isso usa uma ferramenta profissional (API) para <strong>enviar sua mensagem automaticamente</strong> para cada contato válido, um por um, direto no WhatsApp. Você não precisa fazer mais nada. (Requer a configuração técnica no Passo 3.5).
                 </p>
@@ -362,8 +394,14 @@
         <i class="fas fa-robot text-xl"></i>
     </button>
 
-    <!-- Chatbot Container (ATUALIZADO: Classes de posicionamento, tamanho e animação) -->
-    <div id="chatContainer" class="chat-container fixed right-6 bottom-[5.5rem] w-full max-w-sm z-[1000] transition-all duration-300 ease-in-out opacity-0 scale-95 -translate-y-4 pointer-events-none">
+    <!-- Chatbot Container (ATUALIZADO: Classes responsivas para Mobile) -->
+    <div id="chatContainer" 
+         class="chat-container fixed bottom-[5.5rem] z-[1000] 
+                w-[calc(100%-2rem)] right-4 
+                sm:w-full sm:max-w-sm sm:right-6 
+                transition-all duration-300 ease-in-out 
+                opacity-0 scale-95 -translate-y-4 pointer-events-none">
+        
         <div class="chat-window rounded-lg">
             <!-- Chat Header -->
             <div class="chat-header flex justify-between items-center">
