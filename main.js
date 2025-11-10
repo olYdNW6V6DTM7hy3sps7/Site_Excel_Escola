@@ -1,11 +1,11 @@
 // WhatsApp Bulk Contact Manager & Messenger
 // Main JavaScript Module
-// ATUALIZADO: 8 de Novembro de 2025
+// ATUALIZADO: 9 de Novembro de 2025
 // - NOVO: Lógica de "Busca Paginada Escalável"
 // - A IA agora recebe lotes de 200 contatos, um de cada vez.
 // - O JS gerencia o estado da busca (aiSearchState) e o loop de páginas.
 // - A IA atua como "tradutora" de comandos complexos para tags de busca.
-// - NOVO: (HOJE) Detecção Inteligente de Arquivos (PDF, Excel, CSV) e Conversão de PDF
+// - ATUALIZAÇÃO (HOJE): API de Conversão de PDF atualizada para PixelPath v2.0
 
 // ** VARIÁVEL DE AMBIENTE DA API **
 const API_BASE_URL = 'https://site-excel-escola-v1-1-0.onrender.com';
@@ -655,7 +655,11 @@ class WhatsAppBulkManager {
         
         // 3. Validação de tipo de arquivo
         const fileName = file.name.toLowerCase();
-        const PDF_TO_EXCEL_API_URL = 'https://converter-pdf-para-excel.onrender.com/api/v1/convert/pdf-to-excel';
+
+        // *** MODIFICAÇÃO (INÍCIO): API de Conversão de PDF Atualizada ***
+        // A nova URL da API v2.0 (PixelPath) com o formato de saída XLSX.
+        const PDF_TO_EXCEL_API_URL = 'https://converter-pdf-para-excel-v2-0.onrender.com/extract?output_format=xlsx';
+        // *** MODIFICAÇÃO (FIM) ***
 
         if (file.size > 10 * 1024 * 1024) {
             this.showError('O tamanho do arquivo deve ser inferior a 10MB');
@@ -684,7 +688,11 @@ class WhatsAppBulkManager {
         this.showProgress('Convertendo PDF', 'Enviando seu PDF para o servidor de conversão...');
         
         const formData = new FormData();
-        formData.append('pdf_file', file);
+        
+        // *** MODIFICAÇÃO (INÍCIO): Nome do Campo da API Atualizado ***
+        // A API antiga usava 'pdf_file', a nova (PixelPath) usa 'file'.
+        formData.append('file', file);
+        // *** MODIFICAÇÃO (FIM) ***
 
         try {
             const response = await fetch(apiUrl, {
@@ -695,12 +703,13 @@ class WhatsAppBulkManager {
             if (!response.ok) {
                 // Trata erros da API
                 let errorMsg = 'Erro de Conversão: Falha inesperada no servidor.';
+                // (Opcional) A nova API pode retornar erros diferentes, mas mantemos os antigos por enquanto.
                 if (response.status === 400) {
                     errorMsg = 'Erro de Conversão: O arquivo enviado não parece ser um PDF válido.';
                 } else if (response.status === 422) {
-                    errorMsg = 'Erro de Conversão: O PDF é válido, mas nenhuma tabela foi encontrada.';
+                    errorMsg = 'Erro de Conversão: Requisição inválida (API PixelPath).';
                 } else if (response.status === 500) {
-                    errorMsg = 'Erro de Conversão: Falha interna no servidor de PDF.';
+                    errorMsg = 'Erro de Conversão: Falha interna no servidor de PDF (API PixelPath).';
                 }
                 
                 this.hideProgress();
